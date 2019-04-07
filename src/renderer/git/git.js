@@ -1,4 +1,5 @@
 import assign from 'lodash.assign'
+import Log from './log'
 import {spawn} from 'child_process'
 
 class Git {
@@ -22,8 +23,11 @@ class Git {
     args.push(pretty)
 
     const child = spawn(command, args)
+    const log = new Log(fields)
 
-    return child.stdout
+    child.stdout.pipe(log)
+
+    return log
   }
 }
 

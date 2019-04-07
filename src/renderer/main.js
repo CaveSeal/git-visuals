@@ -14,6 +14,6 @@ git.log().on('data', (chunk) => {
 
 /* eslint-disable no-new */
 new Vue({
-  components: { App },
+  components: {App},
   template: '<App/>'
 }).$mount('#app')
