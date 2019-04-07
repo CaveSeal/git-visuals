@@ -17,17 +17,14 @@ class Git {
     fields = Object.keys(opts.format)
     command = 'git'
     format = fields.map((key) => opts.format[key]).join('--')
-    args = ['log', '--numstat', '--date=short', '--reverse']
+    args = ['log', '--numstat', '--date=short', '--reverse', '--before=2008-12-1']
 
     pretty = '--pretty=format:' + '@@@' + format
     args.push(pretty)
 
     const child = spawn(command, args)
-    const log = new Log(fields)
 
-    child.stdout.pipe(log)
-
-    return log
+    return child.stdout.pipe(new Log(fields))
   }
 }
 

@@ -1,6 +1,6 @@
 'use strict'
 
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import {join} from 'path'
 import {readFileSync, writeFileSync} from 'fs'
 
@@ -61,6 +61,12 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createWindow()
   }
+})
+
+ipcMain.on('openFolder', (event, path) => {
+  dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  }, paths => event.sender.send('folderData', paths))
 })
 
 class Store {

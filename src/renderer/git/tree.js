@@ -13,72 +13,74 @@ class Tree {
   }
 
   update (commit) {
-    const curly = /{([^}]+)}/g
     const snip = this.children
+    const curly = /{([^}]+)}/g
 
     const locked = []
-    const unused = []
-    const empty = ['']
+    const remove = []
 
-    // TODO: Think of a cleaner way.
     commit.changes.forEach((change) => {
-      let path = change.file
-      if (path.includes('=>')) {
-        const matches = between(path, curly)
+      let file = change.file
+
+      if (file.includes('=>')) {
+        const matches = between(file, curly)
+
         curly.lastIndex = 0
 
-        let parts = []
-        if (!matches[0]) {
-          parts = matches[0].split('=>')
-            .map((side) => path
-              .replace(curly, side).split('/'))
-        } else {
-          parts = path.split('=>')
-            .map((side) => side.split('/'))
+        let sides = (matches[0] ? matches[0] : file)
+        sides = sides.split('=>')
+        if (matches[0]) {
+          sides = sides.map((side) => file.replace(curly, side))
         }
-        const [left, right] = parts
+        sides = sides.map((side) => side.split('/'))
 
-        const size = get(snip, left.concat('size'))
+        const [left, right] = sides
+        const x = get(snip, [...left, 'size'], 0)
 
-        empty.concat(left).reduce((prev, curr, i, arr) => {
-          update(snip, prev.concat([curr, 'size']), (n) => n - size)
+        left.reduce((path, seg, index, arr) => {
+          const next = [...path.split('/'), seg]
+          update(snip, [...next, 'size'], (n) => n - x)
 
-          const child = get(snip, prev.concat(curr), {size: 0})
-          if (child.size === 0 || i === arr.length) {
-            unused.push(prev.concat(curr).join('/'))
+          const node = get(snip, next, {size: 0})
+          if (node.size === 0 || index === arr.length) {
+            remove.push(next.join('/'))
           }
-          return prev.concat(curr)
+          return next.join('/')
         })
 
-        empty.concat(right).reduce((prev, curr) => {
-          update(snip, prev.concat([curr, 'size']), (n) => (n || 0) + size)
-          update(snip, prev.concat([curr, 'fresh'], (n) => true))
-
-          return prev.concat(curr)
+        right.reduce((path, seg) => {
+          const next = [...path.split('/'), seg]
+          update(snip, [...next, 'size'], (n) => (n || 0) + x)
+          update(snip, [...next, 'keep'], (n) => true)
+          return next.join('/')
         })
-
-        path = right.join('/')
+        file = right.join('/')
       }
 
-      empty.concat(path.split('/')).reduce((prev, curr, i, arr) => {
-        let child = get(snip, prev.concat(curr)) || { fresh: true, size: 0 }
+      file = file.split('/')
+      file.reduce((path, seg, index, arr) => {
+        const next = [...path.split('/'), seg]
 
-        const treepath = prev.concat(curr).join('/')
+        let node = get(snip, next)
+        node = node || { keep: true, size: 0 }
 
-        if (child.fresh) locked.push(treepath)
+        if (node.keep) locked.push(next.join('/'))
 
-        child.size += (+change.a) - (+change.d)
+        node.size += (+change.a) - (+change.d)
 
-        if (!child.fresh && !child.size && !locked.includes(treepath)) {
-          unused.push(prev.concat(curr).join('/'))
+        const isLocked = locked.includes(next.join('/'))
+
+        if (!node.keep && !node.size && !isLocked) {
+          remove.push(next.join('/'))
         } else {
-          update(snip, prev.concat(curr), (n) => child)
+          update(snip, next, (n) => node)
         }
-        child.fresh = isEmpty(child)
-        return prev.concat(curr)
+        node.keep = isEmpty(node)
+
+        return next.join('/')
       })
     })
-    unused.forEach((path) => unset(snip, path.split('/')))
+    remove.forEach((path) => unset(snip, path.split('/')))
   }
 }
 
