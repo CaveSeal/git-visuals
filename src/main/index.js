@@ -1,6 +1,8 @@
 'use strict'
 
 import { app, BrowserWindow } from 'electron'
+import {join} from 'path'
+import {readFileSync, writeFileSync} from 'fs'
 
 /**
  * Set `__static` path to static files in production
@@ -19,16 +21,35 @@ function createWindow () {
   /**
    * Initial window options
    */
+  const opts = {
+    width: 800, height: 600
+  }
+
+  const store = new Store({
+    data: { window: opts }
+  })
+
+  const window = store.get('window')
+
   mainWindow = new BrowserWindow({
-    height: 563,
+    height: window.height,
     useContentSize: true,
-    width: 1000
+    width: window.width
   })
 
   mainWindow.loadURL(winURL)
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+
+  mainWindow.on('resize', () => {
+    const bounds = mainWindow.getBounds()
+
+    store.set('window', {
+      height: bounds.height,
+      width: bounds.width
+    })
   })
 }
 
@@ -45,3 +66,26 @@ app.on('activate', () => {
     createWindow()
   }
 })
+
+class Store {
+  constructor (opts = {}) {
+    opts.name = (opts.name || 'user-data') + '.json'
+
+    this.path = join(app.getPath('userData'), opts.name)
+
+    try {
+      this.data = JSON.parse(readFileSync(this.path))
+    } catch (error) {
+      this.data = opts.data || {}
+    }
+  }
+
+  get (key) {
+    return this.data[key]
+  }
+
+  set (key, value) {
+    this.data[key] = value
+    writeFileSync(this.path, JSON.stringify(this.data))
+  }
+}
