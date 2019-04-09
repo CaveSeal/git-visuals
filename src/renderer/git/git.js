@@ -1,6 +1,6 @@
 import assign from 'lodash.assign'
 import Log from './log'
-import {spawn} from 'child_process'
+import {spawn, spawnSync} from 'child_process'
 
 class Git {
   log (opts = {}) {
@@ -17,7 +17,7 @@ class Git {
     fields = Object.keys(opts.format)
     command = 'git'
     format = fields.map((key) => opts.format[key]).join('--')
-    args = ['log', '--numstat', '--date=short', '--reverse', '--before=2008-12-1']
+    args = ['log', '--numstat', '--date=short', '--reverse', '--before=2008-12-01']
 
     pretty = '--pretty=format:' + '@@@' + format
     args.push(pretty)
@@ -25,6 +25,23 @@ class Git {
     const child = spawn(command, args)
 
     return child.stdout.pipe(new Log(fields))
+  }
+
+  duration () {
+    let args, child, command
+    const date = /\d{4}([.\-/ ])\d{2}\1\d{2}/
+    let result = {}
+
+    command = 'git'
+    args = ['show', 'HEAD', '--pretty=format:%ai', '--no-patch']
+    child = spawnSync(command, args)
+    result.last = child.stdout.toString().match(date)[0]
+
+    args = ['rev-list', '--max-parents=0', 'HEAD', '--pretty=format:%ai']
+    child = spawnSync(command, args)
+    result.first = child.stdout.toString().match(date)[0]
+
+    return result
   }
 }
 
