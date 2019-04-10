@@ -17,7 +17,7 @@ class Git {
     fields = Object.keys(opts.format)
     command = 'git'
     format = fields.map((key) => opts.format[key]).join('--')
-    args = ['log', '--numstat', '--date=short', '--reverse', '--before=2008-12-01']
+    args = ['log', '--numstat', '--date=short', '--reverse', '--before=2007-12-01']
 
     pretty = '--pretty=format:' + '@@@' + format
     args.push(pretty)
@@ -35,11 +35,11 @@ class Git {
     command = 'git'
     args = ['show', 'HEAD', '--pretty=format:%ai', '--no-patch']
     child = spawnSync(command, args)
-    result.last = child.stdout.toString().match(date)[0]
+    result.end = child.stdout.toString().match(date)[0]
 
     args = ['rev-list', '--max-parents=0', 'HEAD', '--pretty=format:%ai']
     child = spawnSync(command, args)
-    result.first = child.stdout.toString().match(date)[0]
+    result.start = child.stdout.toString().match(date)[0]
 
     return result
   }

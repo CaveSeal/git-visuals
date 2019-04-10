@@ -9,6 +9,9 @@ class ForceGraph {
     this.nodes = opts.nodes || []
     this.links = opts.links || []
 
+    this.height = opts.height || 0
+    this.width = opts.width || 0
+
     this.link = svg.append('g').selectAll('.link')
     this.node = svg.append('g').selectAll('.node')
     this.text = svg.append('g').selectAll('.text')
@@ -25,6 +28,8 @@ class ForceGraph {
     const manyBody = d3
       .forceManyBody()
       .strength(-120)
+      .distanceMax(500)
+      .distanceMin(200)
 
     this.simulation = d3
       .forceSimulation(this.nodes)
@@ -48,6 +53,10 @@ class ForceGraph {
   update (nodes, links) {
     const t = d3.transition().duration(750)
 
+    const scale = d3.scaleLinear()
+      .range([5, 15])
+      .domain(d3.extent(nodes, (d) => d.size))
+
     this.link = this.link
       .data(links, (link) => link.target + link.source)
 
@@ -70,7 +79,7 @@ class ForceGraph {
 
     this.node = this.node.enter()
       .append('circle')
-      .attr('r', (d) => d.size)
+      .attr('r', (d) => scale(d.size ? d.size : 1))
       .attr('fill', 'gray')
       .merge(this.node)
 
