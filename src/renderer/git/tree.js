@@ -1,9 +1,6 @@
-import assign from 'lodash.assign'
 import between from '../util/between'
 import get from 'lodash.get'
-import isEmpty from 'lodash.isempty'
 import traverse from '../util/traverse'
-import uniqueId from 'lodash.uniqueid'
 import unset from 'lodash.unset'
 import update from 'lodash.update'
 
@@ -13,130 +10,103 @@ import update from 'lodash.update'
 class Tree {
   constructor () {
     this.children = {}
-    this.depth = 0
     this.graph = {}
+    this.name = ''
   }
 
   update (commit) {
-    const snip = this.children
-    const curly = /{([^}]+)}/g
+    const copy = this.children
+    const regex = /{([^}]+)}/g
 
-    const locked = []
-    const remove = []
-    const empty = ['']
+    for (let i = 0; i < commit.changes.length; ++i) {
+      const change = commit.changes[i]
 
-    commit.changes.forEach((change) => {
       let file = change.file
-      let size
-      let isDirty = false
+      let size = 0
+      let discard = []
 
-      if (file.includes('=>')) {
-        const matches = between(file, curly)
+      if (change.file.includes('=>')) {
+        const match = between(change.file, regex)[0]
 
-        curly.lastIndex = 0
+        regex.lastIndex = 0
 
-        let sides = (matches[0] ? matches[0] : file)
-        sides = sides.split('=>')
-        if (matches[0]) {
-          sides = sides.map((side) => file.replace(curly, side))
-        }
-        sides = sides.map((side) => side.split('/'))
+        const [left, right] = (match || file)
+          .split('=>')
+          .map((side) => (match ? file.replace(regex, side) : side)
+            .split('/')
+            .filter((x) => x !== ''))
 
-        const [left, right] = sides
-        size = get(snip, [...left, 'size'], 0)
+        size = get(copy, [...left, 'size'], 0)
 
-        empty.concat(left).reduce((path, seg, index, arr) => {
-          const next = [...path.split('/'), seg]
-          update(snip, [...next, 'size'], (n) => n - size)
+        left.reduce((path, seg, i, arr) => {
+          path = [...path].concat([seg])
 
-          const node = get(snip, next, {size: 0})
-          if (!node.size || index === arr.length) {
-            remove.push(next.join('/'))
+          update(copy, [...path, 'size'], (n) => n - size + 1)
+
+          const node = get(copy, path)
+          if (Object.values(node).length <= 2) {
+            discard.push(path)
+          } else {
+            discard = discard.filter(path => path.includes(left[0]))
           }
-          return next.join('/')
-        })
+          return path
+        }, [])
 
-        isDirty = true
-        file = right.join('/')
+        file = right
       }
 
-      file = file.split('/')
-      this.depth = Math.max(this.depth, file.length)
+      file = Array.isArray(file) ? file : file.split('/')
 
-      empty.concat(file).reduce((path, seg, index, arr) => {
-        let next = [...path.split('/'), seg]
-        next = next.filter((value) => value !== '')
+      file.reduce((path, seg, i, arr) => {
+        path = path.concat(seg)
 
-        if (isDirty) {
-          update(snip, next, (n) => assign(n, {
-            keep: true,
-            size: (n || 0) + size
-          }))
+        let node = get(copy, path)
+        node = node || {size: 0}
+        node.size += (+change.a) - (+change.d) + size
+
+        if (change.mode === 'delete') {
+          if (Object.values(node).length <= 2) {
+            discard.push(path)
+          } else {
+            discard = discard.filter(path => path.includes(file[0]))
+          }
         }
 
-        let node = get(snip, next)
-        node = node || { keep: true, size: 0 }
-
-        if (node.keep) locked.push(next.join('/'))
-
-        node.size += (+change.a) - (+change.d)
-
-        const isLocked = locked.includes(next.join('/'))
-
-        if (!node.keep && !node.size && !isLocked) {
-          remove.push(next.join('/'))
+        if (node.size > 0) {
+          update(copy, path, (n) => node)
         } else {
-          update(snip, next, (n) => node)
+          discard.push(path)
         }
-        node.keep = isEmpty(node)
 
-        return next.join('/')
-      })
-      isDirty = false
-    })
-    remove.forEach((path) => unset(snip, path.split('/')))
-
-    // Don't do this until it is necessary.
-    this.graph = this.graphify()
+        return path
+      }, [])
+      discard.forEach((path) => unset(copy, path))
+    }
   }
 
-  graphify () {
-    const root = {
-      id: uniqueId(),
-      label: 'root'
+  get root () {
+    const layout = {
+      name: this.name,
+      children: []
     }
 
-    const graph = {
-      links: [],
-      nodes: [root]
-    }
-
-    traverse(this.children, (value, key, parent) => {
-      let target = graph.nodes
-        .find((node) => node.label === parent)
-
-      target = target || root
-
-      let node = graph.nodes
-        .find((node) => node.label === key && node.id === parent)
-
-      node = node || {
-        id: uniqueId(),
-        label: key,
-        size: value.size,
-        parent: parent
-      }
-      node.size = node.size || value.size
-      graph.nodes.push(node)
-
-      graph.links.push({
-        source: graph.nodes[graph.nodes.length - 1].id,
-        strength: 0.1,
-        target: target.id
+    traverse(this.children, (value, key, path) => {
+      let children = layout.children
+      path.forEach((seg) => {
+        let child = children.find((e) => e.name === seg)
+        if (!child) {
+          child = {
+            name: seg,
+            size: value,
+            children: []
+          }
+          children.push(child)
+        }
+        children = child.children
       })
-    }, ['keep', 'size'])
+    }, { ignore: ['keep'] })
 
-    return graph
+    return layout
   }
 }
 

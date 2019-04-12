@@ -1,12 +1,16 @@
-function traverse (obj, fn, ignore) {
+import isObject from 'lodash.isobject'
+
+function traverse (obj, fn, cxt) {
   const args = Array.prototype.slice.call(arguments, 3)
 
+  const path = args[0] || []
+  cxt = cxt || { ignore: [] }
+
   for (let key in obj) {
-    if (!ignore.includes(key)) {
-      fn(obj[key], key, args[0])
-      if (obj[key] && typeof obj[key] === 'object') {
-        traverse(obj[key], fn, ignore, key)
-      }
+    if (cxt.ignore.includes(key)) continue
+    fn(obj[key], key, [...path])
+    if (obj[key] && isObject(obj[key])) {
+      traverse(obj[key], fn, cxt, [...path, key])
     }
   }
 }

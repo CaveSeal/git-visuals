@@ -27,17 +27,21 @@
   "dependencies": {
     "axios": "^0.18.0",
     "d3": "^5.9.2",
+    "d3-hierarchy": "^1.1.8",
     "flat": "^4.1.0",
     "lodash.assign": "^4.2.0",
     "lodash.clonedeep": "^4.5.0",
     "lodash.get": "^4.4.2",
     "lodash.isempty": "^4.4.0",
+    "lodash.isobject": "^3.0.2",
     "lodash.set": "^4.3.2",
+    "lodash.transform": "^4.6.0",
     "lodash.uniqueid": "^4.0.1",
     "lodash.unset": "^4.5.2",
     "lodash.update": "^4.10.2",
     "moment": "^2.24.0",
     "vue": "^2.5.16",
+    "vue-carousel": "^0.18.0",
     "vue-electron": "^1.0.6"
   },
   "devDependencies": {

@@ -16,6 +16,11 @@ class ForceGraph {
     this.node = svg.append('g').selectAll('.node')
     this.text = svg.append('g').selectAll('.text')
 
+    const zoomer = d3.zoom()
+      .on('zoom', this.zoom)
+
+    zoomer(svg)
+
     const linkForce = d3
       .forceLink()
       .links(this.links)
@@ -27,7 +32,7 @@ class ForceGraph {
 
     const manyBody = d3
       .forceManyBody()
-      .strength(-120)
+      .strength(-100)
       .distanceMax(500)
       .distanceMin(200)
 
@@ -37,6 +42,12 @@ class ForceGraph {
       .force('charge', manyBody)
       .force('center', center)
       .on('tick', this.ticked)
+  }
+
+  zoom = () => {
+    this.node.attr('transform', (d) => d3.event.transform)
+    this.link.attr('transform', (d) => d3.event.transform)
+    this.text.attr('transform', (d) => d3.event.transform)
   }
 
   ticked = () => {
@@ -57,6 +68,20 @@ class ForceGraph {
       .range([5, 15])
       .domain(d3.extent(nodes, (d) => d.size))
 
+    this.node = this.node
+      .data(nodes, (d) => d.id)
+
+    this.node.exit()
+      .style('fill', '#b26745')
+      .transition(t)
+      .attr('r', 1e-6)
+      .remove()
+    this.node = this.node.enter()
+      .append('circle')
+      .attr('r', (d) => scale(d.size ? d.size : 1))
+      .attr('fill', 'rgba(175, 227, 19, 1)')
+      .merge(this.node)
+
     this.link = this.link
       .data(links, (link) => link.target + link.source)
 
@@ -67,21 +92,6 @@ class ForceGraph {
       .attr('stroke-width', 1)
       .attr('stroke', 'rgba(50, 50, 50, 0.2)')
       .merge(this.link)
-
-    this.node = this.node
-      .data(nodes, (d) => d.id)
-
-    this.node.exit()
-      .style('fill', '#b26745')
-      .transition(t)
-      .attr('r', 1e-6)
-      .remove()
-
-    this.node = this.node.enter()
-      .append('circle')
-      .attr('r', (d) => scale(d.size ? d.size : 1))
-      .attr('fill', 'gray')
-      .merge(this.node)
 
     this.text = this.text
       .data(nodes, (d) => d)
@@ -94,6 +104,7 @@ class ForceGraph {
       .attr('font-size', 15)
       .attr('dx', 15)
       .attr('dy', 4)
+      .attr('fill', 'rgba(50, 50, 50, 0.2)')
       .merge(this.text)
 
     this.simulation

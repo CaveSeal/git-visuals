@@ -8,10 +8,19 @@ class Log extends Transform {
     this.saved = []
   }
 
+  _flush (next) {
+    let data = this.parse(this.saved)
+    if (data.length) {
+      this.push(Buffer.from(JSON.stringify(data)))
+    }
+    next()
+  }
+
   _transform (chunk, encoding, next) {
     chunk = chunk.toString()
 
     let data = chunk.split('@@@')
+    data = data.filter((value) => !!value)
 
     if (!(/^\s*@@@/.test(chunk))) {
       if (this.saved.length) {
@@ -20,40 +29,62 @@ class Log extends Transform {
       }
     }
 
-    data = data.filter((v) => !!v && (v.length - 1))
     if (data.length) {
-      this.saved.push(data.pop())
+      const save = data.pop()
+      data = [this.saved.pop(), ...data]
+      this.saved.push(save)
     }
 
-    data = this.saved.slice(0, -1).concat(data)
-
-    data = data.map((commit) => {
-      commit = commit.trim().split('\n')
-      const obj = {}
-      let fields = commit.shift().split('--')
-
-      fields.forEach((field, i) => {
-        obj[this.fields[i]] = field
-      })
-
-      commit = commit
-        .map((line) => line
-          .replace(/\s+=>\s+/g, '=>')
-          .replace(/\s+/g, ' ').trim().split(' '))
-        .map((line) => ({
-          a: line[0] === '-' ? 0 : +line[0],
-          d: line[1] === '-' ? 0 : +line[1],
-          file: line[2]
-        }))
-      obj.changes = commit
-
-      return obj
-    })
+    data = this.parse(data)
 
     if (data.length) {
       this.push(Buffer.from(JSON.stringify(data)))
     }
     next()
+  }
+
+  parse (data) {
+    const regex = /(change|create|delete)/g
+
+    return data
+      .filter((value) => !!value && value.length > 1)
+      .map((value) => {
+        value = value.trim().split('\n')
+
+        let fields = value.shift().split('--')
+
+        let changes = value.filter(x => /^([0-9]|-)/.test(x))
+        let modes = value.filter(x => !(/^([0-9]|-)/.test(x)))
+
+        const commit = {}
+
+        fields.forEach((field, i) => {
+          commit[this.fields[i]] = field
+        })
+
+        changes = changes
+          .map((line) => line.replace(/\s+=>\s+/g, '=>')
+            .replace(/\s+/g, ' ').trim().split(' '))
+
+        // Parse file changes
+        changes = changes
+          .map((line) => {
+            const mode = modes.find((m) => m.includes(line[2]))
+
+            const change = {
+              a: line[0] === '-' ? 0 : +line[0],
+              d: line[1] === '-' ? 0 : +line[1],
+              file: line[2],
+              mode: mode ? mode.match(regex)[0] : null
+            }
+            regex.lastIndex = 0
+
+            return change
+          })
+        commit.changes = changes
+
+        return commit
+      })
   }
 }
 
