@@ -11,14 +11,14 @@ import update from 'lodash.update'
 class Tree {
   constructor () {
     this.children = {}
-    this.graph = {}
     this.repository = ''
   }
 
   get root () {
     const layout = {
-      name: this.repository,
-      children: []
+      children: [],
+      id: uniqueId(),
+      name: this.repository
     }
 
     traverse(this.children, (value, key, path) => {

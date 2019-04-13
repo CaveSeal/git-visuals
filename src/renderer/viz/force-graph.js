@@ -6,99 +6,75 @@ class ForceGraph extends Viz {
   constructor (opts = {}) {
     super(opts)
 
-    this.node = this.g.selectAll('.node')
-    this.link = this.g.selectAll('.link')
-    this.text = this.g.selectAll('.text')
+    this.link = this.g.append('g').selectAll('.link')
+      .attr('stroke', '#000').attr('stroke-width', 1.5)
+
+    this.node = this.g.append('g').selectAll('.node')
+      .attr('stroke', '#fff').attr('stroke-width', 1.5)
 
     const linkForce = d3.forceLink()
-
-    const center = d3
-      .forceCenter(0, 0)
-
-    const manyBody = d3
-      .forceManyBody()
-      .strength(-100)
+      .id((d) => d.data.id)
+      .distance(20)
+      .strength((d) => d.target.data.children.length ? 0.2 : 0.7)
 
     this.simulation = d3
       .forceSimulation()
+      .force('charge', d3.forceManyBody())
       .force('link', linkForce)
-      .force('charge', manyBody)
-      .force('center', center)
-      .on('tick', this.ticked)
+      .force('x', d3.forceX())
+      .force('y', d3.forceY())
+      .alphaTarget(1)
+      .on('tick', this.tick)
 
-    const zoom = d3.zoom()
-      .on('zoom', this.zoom)
-
-    zoom(this.svg)
+    this.transition = d3.transition().duration(750)
   }
 
-  ticked = () => {
+  tick = () => {
     this.node.attr('cx', (d) => d.x)
     this.node.attr('cy', (d) => d.y)
     this.link.attr('x1', (d) => d.source.x)
     this.link.attr('y1', (d) => d.source.y)
     this.link.attr('x2', (d) => d.target.x)
     this.link.attr('y2', (d) => d.target.y)
-    this.text.attr('x', (d) => d.x)
-    this.text.attr('y', (d) => d.y)
   }
 
   update (data) {
     const root = hierarchy(data)
 
+    const color = d3.scaleOrdinal(d3.schemeCategory10)
     const links = root.links()
     const nodes = root.descendants()
 
-    const t = d3.transition().duration(750)
-
     const scale = d3.scaleLinear()
-      .range([5, 15])
+      .range([3, 8])
       .domain(d3.extent(nodes, (d) => d.data.size))
 
-    this.node = this.node
-      .data(nodes, (d) => d.data.id)
+    this.node = this.node.data(nodes, (d) => d.data.id)
 
-    this.node.exit()
-      .style('fill', '#b26745')
-      .transition(t)
-      .attr('r', 1e-6)
-      .remove()
+    this.node.exit().remove()
+
+    this.node.attr('class', 'update')
+
     this.node = this.node.enter()
       .append('circle')
-      .attr('r', (d) => scale(d.data.size ? d.data.size : 1))
-      .attr('fill', 'rgba(175, 227, 19, 1)')
+      .attr('fill', (d) => color(d.data.author))
+      .attr('r', (d) => scale(d.data.size))
       .merge(this.node)
 
     this.link = this.link
-      .data(links, (link) => link.target)
+      .data(links, (d) => d.source.data.id + '-' + d.target.data.id)
 
     this.link.exit().remove()
 
     this.link = this.link.enter()
       .append('line')
       .attr('stroke-width', 1)
-      .attr('stroke', 'rgba(50, 50, 50, 0.2)')
+      .attr('stroke', '#000')
       .merge(this.link)
 
-    this.text = this.text
-      .data(nodes, (d) => d.data.id)
-
-    this.text.exit().remove()
-
-    this.text = this.text.enter()
-      .append('text')
-      .text((d) => d.data.name)
-      .attr('font-size', 15)
-      .attr('dx', 15)
-      .attr('dy', 4)
-      .attr('fill', 'rgba(50, 50, 50, 0.2)')
-      .merge(this.text)
-  }
-
-  zoom = () => {
-    this.node.attr('transform', (d) => d3.event.transform)
-    this.link.attr('transform', (d) => d3.event.transform)
-    this.text.attr('transform', (d) => d3.event.transform)
+    this.simulation.nodes(nodes)
+    this.simulation.force('link').links(links)
+    this.simulation.alpha(1).restart()
   }
 }
 
