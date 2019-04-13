@@ -7,15 +7,15 @@ class ForceGraph extends Viz {
     super(opts)
 
     this.link = this.g.append('g').selectAll('.link')
-
     this.node = this.g.append('g').selectAll('.node')
+    this.text = this.g.append('g').selectAll('.text')
 
     const linkForce = d3.forceLink()
       .id((d) => d.data.id)
-      .distance(20)
+      .distance((d) => d.target.data.children.length ? 60 : 30)
       .strength((d) => d.target.data.children.length ? 0.2 : 0.7)
 
-    this.simulation = d3
+    this.force = d3
       .forceSimulation()
       .force('charge', d3.forceManyBody())
       .force('link', linkForce)
@@ -25,11 +25,22 @@ class ForceGraph extends Viz {
       .on('tick', this.tick)
 
     this.transition = d3.transition().duration(750)
+    this.color = d3.scaleOrdinal(d3.schemePastel1)
+  }
+
+  hover () {
+    d3.select(this).attr('fill-opacity', 1)
+  }
+
+  leave () {
+    d3.select(this).attr('fill-opacity', 1e-6)
   }
 
   tick = () => {
     this.node.attr('cx', (d) => d.x)
     this.node.attr('cy', (d) => d.y)
+    this.text.attr('x', (d) => d.x)
+    this.text.attr('y', (d) => d.y)
     this.link.attr('x1', (d) => d.source.x)
     this.link.attr('y1', (d) => d.source.y)
     this.link.attr('x2', (d) => d.target.x)
@@ -39,43 +50,50 @@ class ForceGraph extends Viz {
   update (data) {
     const root = hierarchy(data)
 
-    const color = d3.scaleOrdinal(d3.schemeCategory10)
     const links = root.links()
     const nodes = root.descendants()
 
     const scale = d3.scaleLinear()
-      .range([3, 10])
+      .range([3, 12])
       .domain(d3.extent(nodes, (d) => d.data.size))
-
-    this.node = this.node
-      .data(nodes, (d) => d.data.id)
-      .join(
-        enter => enter.append('circle')
-          .style('fill-opacity', 1e-6)
-          .call(enter => enter.transition(this.transition))
-          .attr('r', (d) => scale(d.data.size))
-          .attr('fill', (d) => color(d.data.author))
-          .style('fill-opacity', 1),
-        update => update,
-        exit => exit
-          .call(exit => exit.transition(this.transition))
-          .style('fill-opacity', 1e-6)
-          .remove()
-      )
 
     this.link = this.link
       .data(links, (d) => d.source.data.id + '-' + d.target.data.id)
       .join(
         enter => enter.append('line')
           .attr('stroke-width', 1)
-          .attr('stroke', '#000'),
+          .attr('stroke', '#ccc')
+          .attr('stroke-opacity', 0.7),
         update => update,
         exit => exit.remove()
       )
 
-    this.simulation.nodes(nodes)
-    this.simulation.force('link').links(links)
-    this.simulation.alpha(1).restart()
+    this.node = this.node
+      .data(nodes, (d) => d.data.id)
+      .join(
+        enter => enter.append('circle')
+          .attr('r', (d) => scale(d.data.size))
+          .attr('fill', (d) => this.color(d.data.author))
+          .attr('stroke', (d) => '#000'),
+        exit => exit.remove()
+      )
+
+    this.text = this.text
+      .data(nodes, (d) => d.data.id)
+      .join(
+        enter => enter.append('text')
+          .attr('x', 12)
+          .attr('dy', '.35em')
+          .attr('fill-opacity', 1e-6)
+          .text((d) => d.data.name)
+          .on('mouseover', this.hover)
+          .on('mouseleave', this.leave),
+        exit => exit.remove()
+      )
+
+    this.force.nodes(nodes)
+    this.force.force('link').links(links)
+    this.force.alpha(1).restart()
   }
 }
 

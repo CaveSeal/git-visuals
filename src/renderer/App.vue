@@ -32,12 +32,14 @@
     components: {},
     data: function () {
       return {
+        after: '',
+        before: '',
         element: '',
         height: 0,
         name: '',
         paused: true,
         progress: 0,
-        interval: 1000,
+        interval: 5000,
         timespan: [],
         width: 0
       }
@@ -70,9 +72,6 @@
         return snaps
       }
     },
-    created: function () {
-
-    },
     mounted: function () {
       this.element = '#' + this.$refs.box.id
       this.height = this.$refs.box.clientHeight
@@ -88,6 +87,8 @@
       },
       clear () {
         this.paused = true
+        this.after = ''
+        this.before = ''
         this.name = ''
         this.progress = 0
         this.timespan = []
@@ -98,15 +99,15 @@
           this.viz = null
         }
       },
-      log (after, before) {
+      draw () {
         const log = git.log({
           format: {
             author: '%an',
             date: '%ad',
             message: '%s'
           },
-          after: after,
-          before: before
+          after: this.after,
+          before: this.before
         })
 
         log.on('data', (chunk) => {
@@ -117,21 +118,23 @@
 
             tree.update(commit)
 
-            if (this.snapshots[after] === null) {
-              this.snapshots[after] = cloneDeep(tree)
+            if (this.snapshots[this.after] === null) {
+              this.snapshots[this.after] = cloneDeep(tree)
             }
           }
         })
 
         log.on('finish', () => {
-          this.update(tree.root)
-
-          if (this.snapshots[after] === null) {
-            delete this.snapshots[after]
+          if (this.viz) {
+            this.viz.update(tree.root)
           }
 
-          if (this.dates[this.dates.length - 1] === before && this.snapshots[before] === null) {
-            delete this.snapshots[before]
+          if (this.snapshots[this.after] === null) {
+            delete this.snapshots[this.after]
+          }
+
+          if (this.dates[this.dates.length - 1] === this.before && this.snapshots[this.before] === null) {
+            delete this.snapshots[this.before]
           }
 
           this.setProgress()
@@ -142,25 +145,8 @@
         if (this.iid) {
           clearInterval(this.iid)
         }
-        this.paused = false
-        let after = ''
-        let before = ''
 
-        this.iid = setInterval(function () {
-          if (!this.paused && this.viz) {
-            this.paused = true
-
-            after = before || this.dates[0]
-            let i = this.dates.indexOf(after) + 1
-            before = this.dates[i]
-
-            this.log(after, before)
-
-            if (this.dates.length === (i + 1)) {
-              clearInterval(this.iid)
-            }
-          }
-        }.bind(this), this.interval)
+        this.iid = setInterval(this.update, this.interval)
       },
       open () {
         ipcRenderer.on('folderData', (event, paths) => {
@@ -176,13 +162,15 @@
           tree.name = this.name
           this.timespan = [git.from, git.to]
 
-          this.loop()
-
           this.viz = new ForceGraph({
             height: this.height,
             element: this.element,
             width: this.width
           })
+
+          this.paused = false
+          this.update()
+          this.loop()
         })
         ipcRenderer.send('openFolder', () => {
           // Send an event to ipc main.
@@ -197,9 +185,19 @@
         this.paused = !this.paused
         e.srcElement.innerText = this.paused ? 'Resume' : 'Pause'
       },
-      update (data) {
-        if (this.viz) {
-          this.viz.update(data)
+      update () {
+        if (!this.paused && this.viz) {
+          this.paused = true
+
+          this.after = this.before || this.dates[0]
+          let i = this.dates.indexOf(this.after) + 1
+          this.before = this.dates[i]
+
+          this.draw()
+
+          if (this.dates.length === (i + 1)) {
+            clearInterval(this.iid)
+          }
         }
       }
     }
