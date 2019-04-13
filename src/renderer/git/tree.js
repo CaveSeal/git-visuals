@@ -1,6 +1,7 @@
 import between from '../util/between'
 import get from 'lodash.get'
 import traverse from '../util/traverse'
+import uniqueId from 'lodash.uniqueid'
 import unset from 'lodash.unset'
 import update from 'lodash.update'
 
@@ -11,7 +12,52 @@ class Tree {
   constructor () {
     this.children = {}
     this.graph = {}
-    this.name = ''
+    this.repository = ''
+  }
+
+  get root () {
+    const layout = {
+      name: this.repository,
+      children: []
+    }
+
+    traverse(this.children, (value, key, path) => {
+      let children = layout.children
+
+      for (let i = 0; i < path.length; ++i) {
+        let node = children
+          .find((d) => path[i] === d.name)
+
+        if (!node) {
+          node = {
+            name: path[i],
+            children: []
+          }
+          children.push(node)
+        }
+
+        if (key.includes('id')) {
+          node.id = value
+        }
+        if (key.includes('author')) {
+          node.author = value
+        }
+        if (key.includes('size')) {
+          node.size = value
+        }
+
+        children = node.children
+      }
+    }, {ignore: ['keep']})
+
+    return layout
+  }
+
+  /**
+   * @param {any} value
+   */
+  set name (value) {
+    this.repository = value
   }
 
   update (commit) {
@@ -41,10 +87,10 @@ class Tree {
         left.reduce((path, seg, i, arr) => {
           path = [...path].concat([seg])
 
-          update(copy, [...path, 'size'], (n) => n - size + 1)
+          update(copy, [...path, 'size'], (n) => n - size)
+          update(copy, [...path, 'author'], (n) => commit.author)
 
-          const node = get(copy, path)
-          if (Object.values(node).length <= 2) {
+          if (Object.values(get(copy, path)).length <= 4) {
             discard.push(path)
           } else {
             discard = discard.filter(path => path.includes(left[0]))
@@ -61,11 +107,12 @@ class Tree {
         path = path.concat(seg)
 
         let node = get(copy, path)
-        node = node || {size: 0}
+        node = node || {size: 0, id: uniqueId()}
         node.size += (+change.a) - (+change.d) + size
+        node.author = commit.author
 
         if (change.mode === 'delete') {
-          if (Object.values(node).length <= 2) {
+          if (Object.values(node).length <= 4) {
             discard.push(path)
           } else {
             discard = discard.filter(path => path.includes(file[0]))
@@ -82,31 +129,6 @@ class Tree {
       }, [])
       discard.forEach((path) => unset(copy, path))
     }
-  }
-
-  get root () {
-    const layout = {
-      name: this.name,
-      children: []
-    }
-
-    traverse(this.children, (value, key, path) => {
-      let children = layout.children
-      path.forEach((seg) => {
-        let child = children.find((e) => e.name === seg)
-        if (!child) {
-          child = {
-            name: seg,
-            size: value,
-            children: []
-          }
-          children.push(child)
-        }
-        children = child.children
-      })
-    }, { ignore: ['keep'] })
-
-    return layout
   }
 }
 

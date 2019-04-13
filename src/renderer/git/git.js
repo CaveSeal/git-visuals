@@ -61,9 +61,8 @@ class Git {
   get name () {
     const args = ['rev-parse', '--show-toplevel']
     const stream = spawnSync('git', args).stdout
-    const path = stream.toString()
 
-    return basename(path)
+    return basename(stream.toString().trim())
   }
 }
 

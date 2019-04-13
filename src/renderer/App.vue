@@ -1,9 +1,18 @@
 <template>
   <div id="app">
     <header id="top">
-      <div>
+      <div class="header-left">
         <h1>Git Visuals</h1>
-        <h3>{{ name }}</h3>
+        <span>{{ ('{' + name + '}') }}</span>
+        <div>
+          <loading-progress
+            v-if="progress"
+            :progress="progress"
+            shape="line"
+            size="140"
+            height="20"
+            width="140"/>
+        </div>
       </div>
     </header>
     <main id="content">
@@ -20,29 +29,24 @@
 </template>
 
 <script>
-  import { Carousel, Slide } from 'vue-carousel'
   import {chdir} from 'process'
   import cloneDeep from 'lodash.clonedeep'
-  // import * as d3 from 'd3'
-  // import ForceGraph from './viz/force-graph'
+  import ForceGraph from './viz/force-graph'
   import git from './git/git'
   import {ipcRenderer} from 'electron'
   import moment from 'moment'
-  // import Sunburst from './viz/sunburst'
   import tree from './git/tree'
 
   export default {
     name: 'git-visuals',
-    components: {
-      Carousel,
-      Slide
-    },
+    components: {},
     data: function () {
       return {
         after: '',
         before: '',
-        name: '',
+        name: 'Select a repository',
         paused: true,
+        progress: null,
         timespan: []
       }
     },
@@ -50,7 +54,10 @@
       dates: function () {
         const dates = Object.keys(this.snapshots)
 
-        return dates.map((d) => moment(d)).sort((a, b) => a - b)
+        return dates
+          .map((d) => moment(d, 'YYYY-MM-DD'))
+          .sort((a, b) => a - b)
+          .map((d) => d.format('YYYY-MM-DD'))
       },
       snapshots: function () {
         const snaps = {}
@@ -58,11 +65,11 @@
         let [from, to] = this.timespan
 
         snaps[from] = null
-        from = moment(from)
+        from = moment(from, 'YYYY-MM-DD')
         from.add(1, 'month')
 
         snaps[to] = null
-        to = moment(to)
+        to = moment(to, 'YYYY-MM-DD')
 
         while (from.isBefore(to)) {
           snaps[from.format('YYYY-MM-01')] = null
@@ -72,81 +79,83 @@
       }
     },
     created: function () {
+      let after = ''
+      let before = ''
+
       // Update viz on each iteration.
       this.iid = setInterval(function () {
         if (!this.paused) {
-          this.after = this.before || this.dates[0]
-
-          let i = this.dates.indexOf(this.after)
-          this.before = !(++i) ? this.dates[1] : this.dates[i]
-
-          if (!this.before) {
-            clearInterval(this.iid)
-            return
-          }
-
           this.paused = true
 
-          const log = git.log({
-            format: {
-              hash: '%h',
-              date: '%ad',
-              author: '%an',
-              message: '%s'
-            },
-            after: this.after.format('YYYY MM DD'),
-            before: this.before.format('YYYY MM DD')
-          })
+          after = before || this.dates[0]
+          let i = this.dates.indexOf(after) + 1
+          before = this.dates[i]
 
-          console.log(this.after.format('YYYY MM DD'))
+          this.log(after, before)
 
-          log.on('data', (chunk) => {
-            const data = JSON.parse(chunk.toString())
+          const values = Object.values(this.snapshots)
+          const total = values.length
+          const count = values.filter((value) => value !== null).length
+          this.progress = count / total
 
-            data.forEach((commit) => {
-              tree.update(commit)
-
-              const month = moment(commit.date)
-                .startOf('month').format('YYYY MM DD')
-              const cache = !this.snapshots[month]
-
-              if (cache) {
-                this.snapshots[month] = cloneDeep(tree)
-              }
-            })
-          })
-          log.on('finish', () => {
-            this.paused = false
-          })
+          if (this.dates.length === (i + 1)) {
+            clearInterval(this.iid)
+          }
         }
       }.bind(this), 1000)
     },
     mounted: function () {
-      // const height = this.$refs.box.clientHeight
-      // const width = this.$refs.box.clientWidth
-
-      // const svg = d3
-      //   .select('#draw')
-      //   .append('svg')
-      //   .attr('width', width)
-      //   .attr('height', height)
-
-      // this.viz = new ForceGraph({
-      //   height: height,
-      //   svg: svg,
-      //   width: width
-      // })
-
-      // Call when switching
-      // d3.select('svg').remove();
+      this.viz = new ForceGraph({
+        height: this.$refs.box.clientHeight,
+        element: '#draw',
+        width: this.$refs.box.clientWidth
+      })
     },
     methods: {
       chdir (path) {
         try {
           chdir(path)
-        } catch (error) {}
+        } catch (error) {
+          console.error(error)
+        }
+      },
+      log (after, before) {
+        const log = git.log({
+          format: {
+            author: '%an',
+            date: '%ad',
+            message: '%s'
+          },
+          after: after,
+          before: before
+        })
+
+        let dates = this.dates.slice().reverse()
+        log.on('data', (chunk) => {
+          const commits = JSON.parse(chunk.toString())
+
+          for (let i = 0; i < commits.length; ++i) {
+            const commit = commits[i]
+
+            tree.update(commit)
+            const date = moment(commit.date, 'YYYY-MM-DD')
+
+            const month = dates
+              .find((d) => moment(d, 'YYYY-MM-DD').isBefore(date))
+
+            if (!this.snapshots[month]) {
+              this.snapshots[month] = cloneDeep(tree)
+            }
+          }
+        })
+
+        log.on('finish', () => {
+          this.update(tree.root)
+          this.paused = false
+        })
       },
       open () {
+        // TODO: Reset all variables
         ipcRenderer.on('folderData', (event, paths) => {
           if (!paths || paths.length > 1) {
             return
@@ -155,6 +164,7 @@
           this.chdir(path)
 
           this.name = git.name
+          tree.name = this.name
           this.timespan = [git.from, git.to]
           this.paused = false
         })
@@ -166,7 +176,7 @@
         console.log(tree)
       },
       update (data) {
-        // this.viz.update(data)
+        this.viz.update(data)
       }
     }
   }
@@ -205,16 +215,31 @@
     padding: 0em 2em;
   }
 
+  .header-left {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+    padding: 16px 0px;
+  }
+
+  .header-left div h1 {
+    flex: 1;
+    height: 100%;
+  }
+
   #top h1 {
     color: #4fc08d;
   }
 
-  #top div {
-    flex: 1;
+  #top span {
+    color: #b4b4b4;
+    font-size: 1.0rem;
+    padding: 0px 4px;
+    margin-bottom: 2px;
   }
 
-  #top h3 {
-    color: #b4b4b4;
+  #top div, #bot div {
+    flex: 1;
   }
 
   #content {
@@ -246,63 +271,3 @@
     background-color: transparent;
   }
 </style>
-
-<!--<div class="date-carousel">
-  <carousel :mouse-drag="true" :paginationEnabled="false" :per-page="6">
-    <slide v-for="date in dates" :key="date.format('YYYY-MM-DD')">
-      <span class="line"></span>
-      <span class="label">{{ date.format('ll') }}</span>
-    </slide>
-  </carousel>
-</div>-->
-
-// .date-carousel {
-//   align-items: center;
-//   display: flex;
-//   height: 100%;
-//   width: 100%;
-// }
-
-// .VueCarousel {
-//   flex: 1;
-//   margin: 0px 24px;
-// }
-
-// .VueCarousel-slide {
-//   cursor: pointer;
-//   min-height: 40px;
-//   position: relative;
-// }
-
-// .label {
-//   flex: 0 0 auto;
-//   position: absolute;
-//   color: #000;
-//   font-size: 0.8rem;
-//   position: absolute;
-//   transform: translate(-50%, -50%);
-//   left: 50%;
-//   text-align: center;
-//   top: 50%;
-//   width: 60%;
-//   height: 40px;
-// }
-
-// .label:after {
-//   background: hsl(153, 47%, 49%);
-//   border-radius: 50%;
-//   content: '';
-//   height: 10px;
-//   width: 10px;
-//   display: block;
-//   padding: 0;
-//   margin: 0 auto;
-// }
-
-// .line {
-//   width: 100%;
-//   background: hsl(153, 47%, 49%);
-//   position: absolute;
-//   height: 2px;
-//   top: 50%;
-// }

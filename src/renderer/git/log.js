@@ -43,48 +43,51 @@ class Log extends Transform {
     next()
   }
 
-  parse (data) {
-    const regex = /(change|create|delete)/g
+  /**
+   * Convert an array of strings into commit objects
+   *
+   * @param commits An array of commits of type string
+   */
+  parse (commits) {
+    const modeRegex = /(change|create|delete)/g
 
-    return data
-      .filter((value) => !!value && value.length > 1)
-      .map((value) => {
-        value = value.trim().split('\n')
+    commits = commits.filter((commit) => !!commit && commit.length > 1)
 
-        let fields = value.shift().split('--')
+    return commits.map((commit) => {
+      const data = {}
 
-        let changes = value.filter(x => /^([0-9]|-)/.test(x))
-        let modes = value.filter(x => !(/^([0-9]|-)/.test(x)))
+      commit = commit.trim().split('\n')
 
-        const commit = {}
+      let info = commit.shift().split('--')
 
-        fields.forEach((field, i) => {
-          commit[this.fields[i]] = field
-        })
+      for (let i = 0; i < info.length; ++i) {
+        data[this.fields[i]] = info[i]
+      }
 
-        changes = changes
-          .map((line) => line.replace(/\s+=>\s+/g, '=>')
-            .replace(/\s+/g, ' ').trim().split(' '))
+      let regex = /^([0-9]|-)/
+      let changes = commit.filter((line) => regex.test(line))
+      let modes = commit.filter((line) => !(regex.test(line)))
 
-        // Parse file changes
-        changes = changes
-          .map((line) => {
-            const mode = modes.find((m) => m.includes(line[2]))
+      changes = changes.map((x) =>
+        x.replace(/\s+=>\s+/g, '=>').replace(/\s+/g, ' ').trim().split(' '))
 
-            const change = {
-              a: line[0] === '-' ? 0 : +line[0],
-              d: line[1] === '-' ? 0 : +line[1],
-              file: line[2],
-              mode: mode ? mode.match(regex)[0] : null
-            }
-            regex.lastIndex = 0
+      changes = changes.map((line) => {
+        const mode = modes.find((mode) => mode.includes(line[2]))
 
-            return change
-          })
-        commit.changes = changes
+        const change = {
+          a: line[0] === '-' ? 0 : +line[0],
+          d: line[1] === '-' ? 0 : +line[1],
+          file: line[2],
+          mode: mode ? mode.match(modeRegex)[0] : null
+        }
+        regex.lastIndex = 0
 
-        return commit
+        return change
       })
+      data.changes = changes
+
+      return data
+    })
   }
 }
 

@@ -1,53 +1,35 @@
 import * as d3 from 'd3'
+import { hierarchy } from 'd3-hierarchy'
+import Viz from './viz'
 
-class ForceGraph {
+class ForceGraph extends Viz {
   constructor (opts = {}) {
-    if (!opts.svg) return
+    super(opts)
 
-    const svg = opts.svg
+    this.node = this.g.selectAll('.node')
+    this.link = this.g.selectAll('.link')
+    this.text = this.g.selectAll('.text')
 
-    this.nodes = opts.nodes || []
-    this.links = opts.links || []
-
-    this.height = opts.height || 0
-    this.width = opts.width || 0
-
-    this.link = svg.append('g').selectAll('.link')
-    this.node = svg.append('g').selectAll('.node')
-    this.text = svg.append('g').selectAll('.text')
-
-    const zoomer = d3.zoom()
-      .on('zoom', this.zoom)
-
-    zoomer(svg)
-
-    const linkForce = d3
-      .forceLink()
-      .links(this.links)
-      .id((d) => d.id)
-      .strength((d) => d.strength)
+    const linkForce = d3.forceLink()
 
     const center = d3
-      .forceCenter(opts.width / 2, opts.height / 2)
+      .forceCenter(0, 0)
 
     const manyBody = d3
       .forceManyBody()
       .strength(-100)
-      .distanceMax(500)
-      .distanceMin(200)
 
     this.simulation = d3
-      .forceSimulation(this.nodes)
+      .forceSimulation()
       .force('link', linkForce)
       .force('charge', manyBody)
       .force('center', center)
       .on('tick', this.ticked)
-  }
 
-  zoom = () => {
-    this.node.attr('transform', (d) => d3.event.transform)
-    this.link.attr('transform', (d) => d3.event.transform)
-    this.text.attr('transform', (d) => d3.event.transform)
+    const zoom = d3.zoom()
+      .on('zoom', this.zoom)
+
+    zoom(this.svg)
   }
 
   ticked = () => {
@@ -61,15 +43,20 @@ class ForceGraph {
     this.text.attr('y', (d) => d.y)
   }
 
-  update (nodes, links) {
+  update (data) {
+    const root = hierarchy(data)
+
+    const links = root.links()
+    const nodes = root.descendants()
+
     const t = d3.transition().duration(750)
 
     const scale = d3.scaleLinear()
       .range([5, 15])
-      .domain(d3.extent(nodes, (d) => d.size))
+      .domain(d3.extent(nodes, (d) => d.data.size))
 
     this.node = this.node
-      .data(nodes, (d) => d.id)
+      .data(nodes, (d) => d.data.id)
 
     this.node.exit()
       .style('fill', '#b26745')
@@ -78,12 +65,12 @@ class ForceGraph {
       .remove()
     this.node = this.node.enter()
       .append('circle')
-      .attr('r', (d) => scale(d.size ? d.size : 1))
+      .attr('r', (d) => scale(d.data.size ? d.data.size : 1))
       .attr('fill', 'rgba(175, 227, 19, 1)')
       .merge(this.node)
 
     this.link = this.link
-      .data(links, (link) => link.target + link.source)
+      .data(links, (link) => link.target)
 
     this.link.exit().remove()
 
@@ -94,25 +81,24 @@ class ForceGraph {
       .merge(this.link)
 
     this.text = this.text
-      .data(nodes, (d) => d)
+      .data(nodes, (d) => d.data.id)
 
     this.text.exit().remove()
 
     this.text = this.text.enter()
       .append('text')
-      .text((d) => d.label)
+      .text((d) => d.data.name)
       .attr('font-size', 15)
       .attr('dx', 15)
       .attr('dy', 4)
       .attr('fill', 'rgba(50, 50, 50, 0.2)')
       .merge(this.text)
+  }
 
-    this.simulation
-      .nodes(nodes)
-      .force('link')
-      .links(links)
-
-    this.simulation.restart()
+  zoom = () => {
+    this.node.attr('transform', (d) => d3.event.transform)
+    this.link.attr('transform', (d) => d3.event.transform)
+    this.text.attr('transform', (d) => d3.event.transform)
   }
 }
 
