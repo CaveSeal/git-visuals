@@ -25,7 +25,7 @@ class Viz {
   }
 
   destroy () {
-    d3.select(this.element).remove()
+    d3.select(this.element).selectAll('*').remove()
   }
 }
 

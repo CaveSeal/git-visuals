@@ -3,27 +3,17 @@
     <header id="top">
       <div class="header-left">
         <h1>Git Visuals</h1>
-        <span>{{ ('{' + name + '}') }}</span>
-        <div>
-          <loading-progress
-            v-if="progress"
-            :progress="progress"
-            shape="line"
-            size="140"
-            height="20"
-            width="140"/>
-        </div>
+        <loading-progress :progress="progress" shape="line" size="140" height="20" width="140"/>
       </div>
     </header>
     <main id="content">
-      <!-- <force-graph :graph="graph"></force-graph> -->
       <div ref="box" id="draw">
         <!-- svg here -->
       </div>
     </main>
     <footer id="bot">
       <button class="alt" @click="open()">Repository</button>
-      <button class="alt" @click="show()">Show Tree</button>
+      <button class="alt" @click="toggle">Pause</button>
     </footer>
   </div>
 </template>
@@ -42,12 +32,14 @@
     components: {},
     data: function () {
       return {
-        after: '',
-        before: '',
-        name: 'Select a repository',
+        element: '',
+        height: 0,
+        name: '',
         paused: true,
-        progress: null,
-        timespan: []
+        progress: 0,
+        interval: 1000,
+        timespan: [],
+        width: 0
       }
     },
     computed: {
@@ -79,37 +71,12 @@
       }
     },
     created: function () {
-      let after = ''
-      let before = ''
 
-      // Update viz on each iteration.
-      this.iid = setInterval(function () {
-        if (!this.paused) {
-          this.paused = true
-
-          after = before || this.dates[0]
-          let i = this.dates.indexOf(after) + 1
-          before = this.dates[i]
-
-          this.log(after, before)
-
-          const values = Object.values(this.snapshots)
-          const total = values.length
-          const count = values.filter((value) => value !== null).length
-          this.progress = count / total
-
-          if (this.dates.length === (i + 1)) {
-            clearInterval(this.iid)
-          }
-        }
-      }.bind(this), 1000)
     },
     mounted: function () {
-      this.viz = new ForceGraph({
-        height: this.$refs.box.clientHeight,
-        element: '#draw',
-        width: this.$refs.box.clientWidth
-      })
+      this.element = '#' + this.$refs.box.id
+      this.height = this.$refs.box.clientHeight
+      this.width = this.$refs.box.clientWidth
     },
     methods: {
       chdir (path) {
@@ -117,6 +84,18 @@
           chdir(path)
         } catch (error) {
           console.error(error)
+        }
+      },
+      clear () {
+        this.paused = true
+        this.name = ''
+        this.progress = 0
+        this.timespan = []
+        tree.clear()
+
+        if (this.viz) {
+          this.viz.destroy()
+          this.viz = null
         }
       },
       log (after, before) {
@@ -130,7 +109,6 @@
           before: before
         })
 
-        let dates = this.dates.slice().reverse()
         log.on('data', (chunk) => {
           const commits = JSON.parse(chunk.toString())
 
@@ -138,24 +116,53 @@
             const commit = commits[i]
 
             tree.update(commit)
-            const date = moment(commit.date, 'YYYY-MM-DD')
 
-            const month = dates
-              .find((d) => moment(d, 'YYYY-MM-DD').isBefore(date))
-
-            if (!this.snapshots[month]) {
-              this.snapshots[month] = cloneDeep(tree)
+            if (this.snapshots[after] === null) {
+              this.snapshots[after] = cloneDeep(tree)
             }
           }
         })
 
         log.on('finish', () => {
           this.update(tree.root)
+
+          if (this.snapshots[after] === null) {
+            delete this.snapshots[after]
+          }
+
+          if (this.dates[this.dates.length - 1] === before && this.snapshots[before] === null) {
+            delete this.snapshots[before]
+          }
+
+          this.setProgress()
           this.paused = false
         })
       },
+      loop () {
+        if (this.iid) {
+          clearInterval(this.iid)
+        }
+        this.paused = false
+        let after = ''
+        let before = ''
+
+        this.iid = setInterval(function () {
+          if (!this.paused && this.viz) {
+            this.paused = true
+
+            after = before || this.dates[0]
+            let i = this.dates.indexOf(after) + 1
+            before = this.dates[i]
+
+            this.log(after, before)
+
+            if (this.dates.length === (i + 1)) {
+              clearInterval(this.iid)
+            }
+          }
+        }.bind(this), this.interval)
+      },
       open () {
-        // TODO: Reset all variables
         ipcRenderer.on('folderData', (event, paths) => {
           if (!paths || paths.length > 1) {
             return
@@ -163,20 +170,38 @@
           let [path] = paths
           this.chdir(path)
 
+          this.clear()
+
           this.name = git.name
           tree.name = this.name
           this.timespan = [git.from, git.to]
-          this.paused = false
+
+          this.loop()
+
+          this.viz = new ForceGraph({
+            height: this.height,
+            element: this.element,
+            width: this.width
+          })
         })
         ipcRenderer.send('openFolder', () => {
           // Send an event to ipc main.
         })
       },
-      show () {
-        console.log(tree)
+      setProgress () {
+        const values = Object.values(this.snapshots)
+        const count = values.filter((x) => !!x).length
+        this.progress = count / values.length
+      },
+      toggle (e) {
+        this.paused = !this.paused
+        e.srcElement.innerText = this.paused ? 'Resume' : 'Pause'
       },
       update (data) {
-        this.viz.update(data)
+        console.log(data)
+        if (this.viz) {
+          this.viz.update(data)
+        }
       }
     }
   }
@@ -200,8 +225,7 @@
       radial-gradient(
         ellipse at top left,
         rgba(255, 255, 255, 1) 40%,
-        rgba(229, 229, 229, .9) 100%
-      );
+        rgba(229, 229, 229, .9) 100%);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -231,13 +255,6 @@
     color: #4fc08d;
   }
 
-  #top span {
-    color: #b4b4b4;
-    font-size: 1.0rem;
-    padding: 0px 4px;
-    margin-bottom: 2px;
-  }
-
   #top div, #bot div {
     flex: 1;
   }
@@ -252,18 +269,19 @@
   }
 
   #bot button {
-    font-size: .8em;
-    cursor: pointer;
-    outline: none;
-    padding: 0.75em 2em;
-    margin: 0em 0.25em;
-    border-radius: 2em;
-    display: inline-block;
-    color: #fff;
     background-color: #4fc08d;
-    transition: all 0.15s ease;
-    box-sizing: border-box;
     border: 1px solid #4fc08d;
+    border-radius: 2em;
+    box-sizing: border-box;
+    color: #fff;
+    cursor: pointer;
+    display: inline-block;
+    font-size: .8em;
+    outline: none;
+    margin: 0em 0.25em;
+    padding: 0.75em 2em;
+    transition: all 0.15s ease;
+    min-width: 120px;
   }
 
   .doc button.alt {

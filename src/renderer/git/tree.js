@@ -14,6 +14,11 @@ class Tree {
     this.repository = ''
   }
 
+  clear () {
+    this.children = {}
+    this.repository = ''
+  }
+
   get root () {
     const layout = {
       children: [],

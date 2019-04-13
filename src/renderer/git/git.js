@@ -5,7 +5,7 @@ import {spawn, spawnSync} from 'child_process'
 
 class Git {
   log (opts = {}) {
-    let after, args, before, command, fields, format, pretty
+    let args, command, fields, format, pretty
 
     opts = assign({
       format: {
@@ -24,13 +24,11 @@ class Git {
     args.push(pretty)
 
     if (opts.after) {
-      after = '--after=' + opts.after
-      args.push(after)
+      args.push('--after=' + opts.after)
     }
 
     if (opts.before) {
-      before = '--before=' + opts.before
-      args.push(before)
+      args.push('--before=' + opts.before)
     }
 
     const child = spawn(command, args)
