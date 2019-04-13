@@ -24,8 +24,7 @@ class ForceGraph extends Viz {
       .alphaTarget(1)
       .on('tick', this.tick)
 
-    this.transition = d3
-      .transition().duration(750)
+    this.transition = d3.transition().duration(750)
   }
 
   tick = () => {
@@ -45,44 +44,34 @@ class ForceGraph extends Viz {
     const nodes = root.descendants()
 
     const scale = d3.scaleLinear()
-      .range([3, 8])
+      .range([3, 10])
       .domain(d3.extent(nodes, (d) => d.data.size))
 
     this.node = this.node
       .data(nodes, (d) => d.data.id)
       .join(
         enter => enter.append('circle')
+          .style('fill-opacity', 1e-6)
+          .call(enter => enter.transition(this.transition))
           .attr('r', (d) => scale(d.data.size))
           .attr('fill', (d) => color(d.data.author))
           .style('fill-opacity', 1),
-        update => update
-          .attr('fill', 'gray'),
+        update => update,
         exit => exit
           .call(exit => exit.transition(this.transition))
           .style('fill-opacity', 1e-6)
           .remove()
       )
 
-    // this.node.attr('class', 'update')
-
-    // this.node = this.node.enter()
-    //   .append('circle')
-    //   .merge(this.node)
-    //   .attr('fill', (d) => color(d.data.author))
-    //   .attr('r', (d) => scale(d.data.size))
-
-    // this.node.exit().remove()
-
     this.link = this.link
       .data(links, (d) => d.source.data.id + '-' + d.target.data.id)
-
-    this.link.exit().remove()
-
-    this.link = this.link.enter()
-      .append('line')
-      .attr('stroke-width', 1)
-      .attr('stroke', '#000')
-      .merge(this.link)
+      .join(
+        enter => enter.append('line')
+          .attr('stroke-width', 1)
+          .attr('stroke', '#000'),
+        update => update,
+        exit => exit.remove()
+      )
 
     this.simulation.nodes(nodes)
     this.simulation.force('link').links(links)

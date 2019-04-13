@@ -198,7 +198,6 @@
         e.srcElement.innerText = this.paused ? 'Resume' : 'Pause'
       },
       update (data) {
-        console.log(data)
         if (this.viz) {
           this.viz.update(data)
         }
