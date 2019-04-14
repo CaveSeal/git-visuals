@@ -137,4 +137,4 @@ class Tree {
   }
 }
 
-export default new Tree()
+export default Tree

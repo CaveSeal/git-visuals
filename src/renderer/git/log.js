@@ -49,7 +49,7 @@ class Log extends Transform {
    * @param commits An array of commits of type string
    */
   parse (commits) {
-    const modeRegex = /(change|create|delete)/g
+    const modeRegex = /(change|create|delete|rename)/g
 
     commits = commits.filter((commit) => !!commit && commit.length > 1)
 

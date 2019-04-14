@@ -1,16 +1,17 @@
-import Vue from 'vue'
-import VueProgress from 'vue-progress-path'
 import axios from 'axios'
+import ElementUI from 'element-ui'
+import locale from 'element-ui/lib/locale/lang/en'
+import Vue from 'vue'
+
+import 'element-ui/lib/theme-chalk/index.css'
 
 import App from './App'
-
-import 'vue-progress-path/dist/vue-progress-path.css'
 
 if (!process.env.IS_WEB) Vue.use(require('vue-electron'))
 Vue.http = Vue.prototype.$http = axios
 Vue.config.productionTip = false
 
-Vue.use(VueProgress)
+Vue.use(ElementUI, {locale})
 
 /* eslint-disable no-new */
 new Vue({

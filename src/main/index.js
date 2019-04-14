@@ -28,7 +28,10 @@ function createWindow () {
   const window = store.get('window')
 
   mainWindow = new BrowserWindow({
+    frame: false,
     height: window.height,
+    titleBarStyle: 'hiddenInset',
+    transparent: true,
     useContentSize: true,
     width: window.width
   })
@@ -63,10 +66,10 @@ app.on('activate', () => {
   }
 })
 
-ipcMain.on('openFolder', (event, path) => {
+ipcMain.on('select', (event, path) => {
   dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']
-  }, paths => event.sender.send('folderData', paths))
+  }, paths => event.sender.send('repository', paths))
 })
 
 class Store {

@@ -28,6 +28,7 @@
     "axios": "^0.18.0",
     "d3": "^5.9.2",
     "d3-hierarchy": "^1.1.8",
+    "element-ui": "^2.7.2",
     "flat": "^4.1.0",
     "lodash.assign": "^4.2.0",
     "lodash.clonedeep": "^4.5.0",
@@ -41,9 +42,7 @@
     "lodash.update": "^4.10.2",
     "moment": "^2.24.0",
     "vue": "^2.5.16",
-    "vue-carousel": "^0.18.0",
-    "vue-electron": "^1.0.6",
-    "vue-progress-path": "0.0.2"
+    "vue-electron": "^1.0.6"
   },
   "devDependencies": {
     "ajv": "^6.5.0",

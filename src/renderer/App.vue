@@ -1,211 +1,158 @@
 <template>
   <div id="app">
-    <header id="top">
-      <div class="header-left">
-        <h1>Git Visuals</h1>
-        <loading-progress :progress="progress" shape="line" size="140" height="20" width="140"/>
-      </div>
-    </header>
-    <main id="content">
-      <div ref="box" id="draw">
-        <!-- svg here -->
-      </div>
-    </main>
-    <footer id="bot">
-      <button class="alt" @click="open()">Repository</button>
-      <button class="alt" @click="toggle">Pause</button>
-    </footer>
+    <el-container>
+      <el-header height="35px" class="window-frame">
+      </el-header>
+      <el-container>
+        <el-aside width="300px">
+          <div class="add-repository">
+            <el-button type="primary" icon="el-icon-plus" @click="explore()" circle></el-button>
+            <span>Add a repository</span>
+          </div>
+          <div class="repositories">
+            <span>Repositories</span>
+            <div v-for="repo in repos" @click="choose(repo)" v-bind:class="{active: active(repo)}">
+              {{ repo.name }}
+            </div>
+          </div>
+        </el-aside>
+        <el-container>
+          <el-header>
+            <div class="date-picker">
+              <el-date-picker
+                v-model="range"
+                type="daterange"
+                range-separator="To"
+                start-placeholder="Start date"
+                end-placeholder="End date"
+                :picker-options="options">
+              </el-date-picker>
+            </div>
+          </el-header>
+          <el-main>
+            <div class="pillar"></div>
+            <div class="content">
+              <div ref="box" id="draw"></div>
+              <el-progress :show-text="false" :stroke-width="8" :percentage="progress"></el-progress>
+            </div>
+            <div class="pillar"></div>
+          </el-main>
+          <el-footer>
+            <el-button size="mini" round @click="toggle">Play</el-button>
+          </el-footer>
+        </el-container>
+      </el-container>
+    </el-container>
   </div>
 </template>
 
 <script>
-  import {chdir} from 'process'
-  import cloneDeep from 'lodash.clonedeep'
   import ForceGraph from './viz/force-graph'
-  import git from './git/git'
   import {ipcRenderer} from 'electron'
-  import moment from 'moment'
-  import tree from './git/tree'
+  import Repo from './git/repo'
 
   export default {
     name: 'git-visuals',
-    components: {},
     data: function () {
       return {
-        after: '',
-        before: '',
-        element: '',
+        box: '',
+        delay: 1000,
+        endDate: null,
         height: 0,
-        name: '',
+        options: {
+          disabledDate: (time) => {
+            if (!this.selected) return false
+            return time.getTime() < this.startDate || time.getTime() > this.endDate
+          }
+        },
         paused: true,
         progress: 0,
-        interval: 5000,
-        timespan: [],
+        range: '',
+        repos: [],
+        selected: null,
+        startDate: null,
+        viz: null,
         width: 0
       }
     },
-    computed: {
-      dates: function () {
-        const dates = Object.keys(this.snapshots)
-
-        return dates
-          .map((d) => moment(d, 'YYYY-MM-DD'))
-          .sort((a, b) => a - b)
-          .map((d) => d.format('YYYY-MM-DD'))
-      },
-      snapshots: function () {
-        const snaps = {}
-
-        let [from, to] = this.timespan
-
-        snaps[from] = null
-        from = moment(from, 'YYYY-MM-DD')
-        from.add(1, 'month')
-
-        snaps[to] = null
-        to = moment(to, 'YYYY-MM-DD')
-
-        while (from.isBefore(to)) {
-          snaps[from.format('YYYY-MM-01')] = null
-          from.add(1, 'month')
+    created: function () {
+      ipcRenderer.on('repository', (event, path) => {
+        if (!path) {
+          return
         }
-        return snaps
-      }
+        this.repos.push(new Repo(path[0]))
+      })
     },
     mounted: function () {
-      this.element = '#' + this.$refs.box.id
+      this.box = '#' + this.$refs.box.id
       this.height = this.$refs.box.clientHeight
       this.width = this.$refs.box.clientWidth
     },
     methods: {
-      chdir (path) {
-        try {
-          chdir(path)
-        } catch (error) {
-          console.error(error)
-        }
+      active (repo) {
+        if (!repo || !this.selected) return false
+        return repo.name === this.selected.name
       },
-      clear () {
-        this.paused = true
-        this.after = ''
-        this.before = ''
-        this.name = ''
-        this.progress = 0
-        this.timespan = []
-        tree.clear()
+      choose (repo) {
+        this.selected = repo
+        this.selected.bind()
+        this.startDate = repo.getStartDate()
+        this.endDate = repo.getEndDate()
 
         if (this.viz) {
           this.viz.destroy()
           this.viz = null
         }
-      },
-      draw () {
-        const log = git.log({
-          format: {
-            author: '%an',
-            date: '%ad',
-            message: '%s'
-          },
-          after: this.after,
-          before: this.before
+
+        this.viz = new ForceGraph({
+          height: this.height,
+          element: this.box,
+          width: this.width
         })
 
-        log.on('data', (chunk) => {
-          const commits = JSON.parse(chunk.toString())
+        let tree = this.selected.recent()
+        if (tree) {
+          this.viz.update(tree.root)
+        } else {
+          this.selected.on('update', () => {
+            this.progress = this.selected.progress
 
-          for (let i = 0; i < commits.length; ++i) {
-            const commit = commits[i]
+            tree = this.selected.recent()
+            if (tree) this.viz.update(tree.root)
+          })
+          this.selected.next()
+        }
 
-            tree.update(commit)
-
-            if (this.snapshots[this.after] === null) {
-              this.snapshots[this.after] = cloneDeep(tree)
-            }
-          }
-        })
-
-        log.on('finish', () => {
-          if (this.viz) {
-            this.viz.update(tree.root)
-          }
-
-          if (this.snapshots[this.after] === null) {
-            delete this.snapshots[this.after]
-          }
-
-          if (this.dates[this.dates.length - 1] === this.before && this.snapshots[this.before] === null) {
-            delete this.snapshots[this.before]
-          }
-
-          this.setProgress()
-          this.paused = false
-        })
-      },
-      loop () {
         if (this.iid) {
           clearInterval(this.iid)
         }
 
-        this.iid = setInterval(this.update, this.interval)
+        this.iid = setInterval(this.loop, this.delay)
       },
-      open () {
-        ipcRenderer.on('folderData', (event, paths) => {
-          if (!paths || paths.length > 1) {
-            return
-          }
-          let [path] = paths
-          this.chdir(path)
-
-          this.clear()
-
-          this.name = git.name
-          tree.name = this.name
-          this.timespan = [git.from, git.to]
-
-          this.viz = new ForceGraph({
-            height: this.height,
-            element: this.element,
-            width: this.width
-          })
-
-          this.paused = false
-          this.update()
-          this.loop()
-        })
-        ipcRenderer.send('openFolder', () => {
+      explore () {
+        ipcRenderer.send('select', () => {
           // Send an event to ipc main.
         })
       },
-      setProgress () {
-        const values = Object.values(this.snapshots)
-        const count = values.filter((x) => !!x).length
-        this.progress = count / values.length
-      },
-      toggle (e) {
-        this.paused = !this.paused
-        e.srcElement.innerText = this.paused ? 'Resume' : 'Pause'
-      },
-      update () {
-        if (!this.paused && this.viz) {
+      loop () {
+        if (!this.paused) {
           this.paused = true
 
-          this.after = this.before || this.dates[0]
-          let i = this.dates.indexOf(this.after) + 1
-          this.before = this.dates[i]
+          this.selected.next()
 
-          this.draw()
-
-          if (this.dates.length === (i + 1)) {
-            clearInterval(this.iid)
-          }
+          this.paused = false
         }
+      },
+      toggle (event) {
+        this.paused = !this.paused
+        event.srcElement.innerText = this.paused ? 'Play' : 'Pause'
       }
     }
   }
 </script>
 
 <style>
-  @import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro');
+  @import url('https://fonts.googleapis.com/css?family=Abel');
 
   * {
     box-sizing: border-box;
@@ -214,75 +161,135 @@
   }
 
   body {
-    font-family: 'Source Sans Pro', sans-serif;
+    font-family: 'Abel', sans-serif;
   }
 
   #app {
-    background:
-      radial-gradient(
-        ellipse at top left,
-        rgba(255, 255, 255, 1) 40%,
-        rgba(229, 229, 229, .9) 100%);
-    display: flex;
-    flex-direction: column;
     height: 100vh;
     width: 100vw;
   }
 
-  #top, #bot {
-    display: flex;
-    flex: 1;
+  .el-button--primary, .el-footer .el-button {
+    background-color: #393e46;
+    border: none;
+    color: #eee;
+  }
+
+  .el-button:hover, .el-button:active {
+    background-color: #4ecca3;
+  }
+
+  .date-picker {
     align-items: center;
-    padding: 0em 2em;
-  }
-
-  .header-left {
     display: flex;
-    flex-flow: column;
-    height: 100%;
-    padding: 16px 0px;
-  }
-
-  .header-left div h1 {
-    flex: 1;
     height: 100%;
   }
 
-  #top h1 {
-    color: #4fc08d;
-  }
-
-  #top div, #bot div {
-    flex: 1;
-  }
-
-  #content {
-    flex: 6;
-  }
-
-  #content #draw {
-    height: 100%;
+  .el-date-editor {
     width: 100%;
   }
 
-  #bot button {
-    background-color: #4fc08d;
-    border: 1px solid #4fc08d;
-    border-radius: 2em;
-    box-sizing: border-box;
-    color: #fff;
-    cursor: pointer;
-    display: inline-block;
-    font-size: .8em;
-    outline: none;
-    margin: 0em 0.25em;
-    padding: 0.75em 2em;
-    transition: all 0.15s ease;
-    min-width: 120px;
+  .el-date-editor, .el-date-editor .el-range-input {
+    background-color: #393e46;
+    border: none;
+    color: #ccc;
+    font-family: 'Abel', sans-serif;
   }
 
-  .doc button.alt {
-    color: #42b983;
-    background-color: transparent;
+  .el-date-editor .el-range-separator {
+    color: #ccc;
+    width: 6%;
+  }
+
+  .el-header, .el-footer {
+    background-color: #393e46;
+  }
+
+  .el-header {
+    border-top: 1px solid #333;
+  }
+
+  .el-footer {
+    padding: 16px 24px;
+  }
+
+  .el-aside {
+    background-color: #232931;
+    color: #ddd;
+    font-size: 16px;
+  }
+
+  .el-footer .el-button {
+    width: 70px;
+  }
+
+  .add-repository {
+    padding: 12px 24px;
+  }
+
+  .repositories {
+    padding: 32px;
+  }
+
+  .add-repository {
+    border-bottom: 1px solid #393e46;
+  }
+
+  .add-repository span {
+    margin: 0px 8px;
+  }
+
+  .repositories div {
+    background-color: #393e46;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 8px;
+    padding: 4px 18px;
+  }
+
+  .repositories div:hover, .repositories div.active {
+    background-color: #4ecca3;
+  }
+  
+  .el-main {
+    background-color: #393e46;
+    display: flex;
+    padding: 0;
+  }
+  
+  .el-main .content {
+    background-color: #fff;
+    border-radius: 5px;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .el-main #draw {
+    flex: 1;
+  }
+
+  .el-main .pillar {
+    background-color: #393e46;
+    flex: 0 0 auto;
+    width: 20px;
+  }
+  
+  .el-container {
+    height: 100%
+  }
+
+  .el-progress-bar__outer {
+    background: #ddd;
+    border-radius: 0px 0px 5px 5px;
+  }
+
+  .el-progress-bar__inner {
+    background: #4ecca3;
+    border-radius: 0px;
+  }
+
+  .window-frame {
+    -webkit-app-region: drag;
   }
 </style>
