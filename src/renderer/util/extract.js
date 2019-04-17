@@ -1,4 +1,4 @@
-function between (str, regex) {
+function extract (str, regex) {
   const found = []
 
   if (regex instanceof RegExp) {
@@ -11,4 +11,4 @@ function between (str, regex) {
   return found
 }
 
-export default between
+export default extract

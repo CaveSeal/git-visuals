@@ -1,16 +1,14 @@
-import isObject from 'lodash.isobject'
+import isPlainObject from 'lodash.isplainobject'
 
-function traverse (obj, fn, cxt) {
-  const args = Array.prototype.slice.call(arguments, 3)
+function traverse (obj, fn) {
+  const args = Array.prototype.slice.call(arguments, 2)
 
   const path = args[0] || []
-  cxt = cxt || { ignore: [] }
 
   for (let key in obj) {
-    if (cxt.ignore.includes(key)) continue
     fn(obj[key], key, [...path])
-    if (obj[key] && isObject(obj[key])) {
-      traverse(obj[key], fn, cxt, [...path, key])
+    if (obj[key] && isPlainObject(obj[key])) {
+      traverse(obj[key], fn, [...path, key])
     }
   }
 }

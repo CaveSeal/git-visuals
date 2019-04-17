@@ -66,10 +66,10 @@ app.on('activate', () => {
   }
 })
 
-ipcMain.on('select', (event, path) => {
+ipcMain.on('openFolder', (event, path) => {
   dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']
-  }, paths => event.sender.send('repository', paths))
+  }, paths => event.sender.send('folders', paths))
 })
 
 class Store {

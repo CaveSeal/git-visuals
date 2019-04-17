@@ -1,6 +1,6 @@
 import * as d3 from 'd3'
 
-class Viz {
+class Chart {
   constructor (opts = {}) {
     if (!opts.element) return
 
@@ -13,12 +13,7 @@ class Viz {
       .append('svg')
       .attr('height', this.height)
       .attr('width', this.width)
-
-    this.g = this.svg.append('g')
-      .attr('transform', `translate(${this.width / 2},${this.height / 2})`)
   }
-
-  zoom = () => {}
 
   update (data) {
     // Nothing implemented
@@ -29,4 +24,4 @@ class Viz {
   }
 }
 
-export default Viz
+export default Chart

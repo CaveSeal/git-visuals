@@ -1,66 +1,101 @@
 import assign from 'lodash.assign'
-import {basename} from 'path'
-import Log from './log'
+import LogTransform from './log-transform'
 import {spawn, spawnSync} from 'child_process'
 
 class Git {
-  log (opts = {}) {
-    let args, command, fields, format, pretty
+  constructor (opts = {}) {
+    this.cwd = opts.cwd
+  }
 
+  chdir (path) {
+    this.cwd = path
+  }
+
+  log (opts = {}) {
     opts = assign({
+      args: [
+        '--summary',
+        '--numstat',
+        '--date=short',
+        '--reverse'
+      ],
       format: {
-        hash: '%h',
+        author: '%an',
         date: '%ad',
-        author: '%an'
-      }
+        hash: '%h',
+        message: '%s'
+      },
+      separator: '@@@'
     }, opts)
 
-    fields = Object.keys(opts.format)
-    command = 'git'
-    format = fields.map((key) => opts.format[key]).join('--')
-    args = ['log', '--summary', '--numstat', '--date=short', '--reverse']
+    const args = ['log', ...opts.args]
 
-    pretty = '--pretty=format:' + '@@@' + format
-    args.push(pretty)
+    const format = Object.values(opts.format).join('--')
 
     if (opts.after) {
-      args.push('--after=' + opts.after)
+      args.push(`--after=${opts.after}`)
     }
 
     if (opts.before) {
-      args.push('--before=' + opts.before)
+      args.push(`--after=${opts.before}`)
     }
 
-    const child = spawn(command, args)
+    args.push(`--pretty=format:${opts.separator}${format}`)
 
-    return child.stdout.pipe(new Log(fields))
+    const log = new LogTransform({
+      fields: Object.keys(opts.format)
+    })
+    return this.spawn(args).pipe(log)
   }
 
-  // TODO: Cache value.
-  get from () {
+  /**
+   * Get the date of the first ever commit.
+   */
+  getDateOfFirst () {
     const regex = /\d{4}([.\-/ ])\d{2}\1\d{2}/
-    const args = ['rev-list', '--max-parents=0', 'HEAD', '--pretty=format:%ai']
-    const stream = spawnSync('git', args).stdout
-    const [date] = stream.toString().match(regex)
-
-    return date
+    const args = [
+      'rev-list',
+      '--max-parents=0',
+      'HEAD',
+      '--pretty=format:%ai'
+    ]
+    return this.spawnString(args).match(regex)[0]
   }
 
-  // TODO: Cache value.
-  get to () {
+  /**
+   * Get the date of the current last commit.
+   */
+  getDateOfLast () {
     const regex = /\d{4}([.\-/ ])\d{2}\1\d{2}/
-    const args = ['show', 'HEAD', '--pretty=format:%ai', '--no-patch']
-    const stream = spawnSync('git', args).stdout
-    const [date] = stream.toString().match(regex)
-
-    return date
+    const args = [
+      'show',
+      'HEAD',
+      '--pretty=format:%ai',
+      '--no-patch'
+    ]
+    return this.spawnString(args).match(regex)[0]
   }
 
-  get name () {
-    const args = ['rev-parse', '--show-toplevel']
-    const stream = spawnSync('git', args).stdout
+  spawn (args) {
+    const stream = spawn('git', args, {
+      cwd: this.cwd,
+      env: process.env
+    })
 
-    return basename(stream.toString().trim())
+    // Error handling...
+
+    return stream.stdout
+  }
+
+  spawnString (args) {
+    const stream = spawnSync('git', args, {
+      cwd: this.cwd,
+      env: process.env
+    })
+
+    // Error handling...
+
+    return stream.stdout.toString()
   }
 }
 

@@ -1,14 +1,16 @@
 import * as d3 from 'd3'
 import { hierarchy } from 'd3-hierarchy'
-import Viz from './viz'
+import Chart from './chart'
 
-class ForceGraph extends Viz {
+class ForceGraph extends Chart {
   constructor (opts = {}) {
     super(opts)
 
-    this.link = this.g.append('g').selectAll('.link')
-    this.node = this.g.append('g').selectAll('.node')
-    this.text = this.g.append('g').selectAll('.text')
+    const g = this.svg.append('g')
+      .attr('transform', `translate(${this.width / 2},${this.height / 2})`)
+
+    this.link = g.append('g').selectAll('.link')
+    this.node = g.append('g').selectAll('.node')
 
     const linkForce = d3.forceLink()
       .id((d) => d.data.id)
@@ -28,19 +30,9 @@ class ForceGraph extends Viz {
     this.color = d3.scaleOrdinal(d3.schemePastel1)
   }
 
-  hover () {
-    d3.select(this).attr('fill-opacity', 1)
-  }
-
-  leave () {
-    d3.select(this).attr('fill-opacity', 1e-6)
-  }
-
   tick = () => {
     this.node.attr('cx', (d) => d.x)
     this.node.attr('cy', (d) => d.y)
-    this.text.attr('x', (d) => d.x)
-    this.text.attr('y', (d) => d.y)
     this.link.attr('x1', (d) => d.source.x)
     this.link.attr('y1', (d) => d.source.y)
     this.link.attr('x2', (d) => d.target.x)
@@ -48,6 +40,8 @@ class ForceGraph extends Viz {
   }
 
   update (data) {
+    console.log(data)
+
     const root = hierarchy(data)
 
     const links = root.links()
@@ -55,7 +49,7 @@ class ForceGraph extends Viz {
 
     const scale = d3.scaleLinear()
       .range([3, 12])
-      .domain(d3.extent(nodes, (d) => d.data.size))
+      .domain(d3.extent(nodes, (d) => d.data.a - d.data.d))
 
     this.link = this.link
       .data(links, (d) => d.source.data.id + '-' + d.target.data.id)
@@ -72,22 +66,12 @@ class ForceGraph extends Viz {
       .data(nodes, (d) => d.data.id)
       .join(
         enter => enter.append('circle')
-          .attr('r', (d) => scale(d.data.size))
-          .attr('fill', (d) => this.color(d.data.author))
-          .attr('stroke', (d) => '#000'),
-        exit => exit.remove()
-      )
-
-    this.text = this.text
-      .data(nodes, (d) => d.data.id)
-      .join(
-        enter => enter.append('text')
-          .attr('x', 12)
-          .attr('dy', '.35em')
-          .attr('fill-opacity', 1e-6)
-          .text((d) => d.data.name)
-          .on('mouseover', this.hover)
-          .on('mouseleave', this.leave),
+          .attr('stroke', (d) => '#000')
+          .attr('r', (d) => scale(d.data.a - d.data.d))
+          .attr('fill', (d) => this.color(d.data.author)),
+        update => update
+          .attr('fx', (d) => d.x)
+          .attr('fy', (d) => d.y),
         exit => exit.remove()
       )
 
