@@ -2,19 +2,22 @@
   <div id="app">
     <el-container>
       <el-header height="35px" class="window-frame"></el-header>
-      <el-container>
-        <app-sidebar span="350px" v-on:select="onSelect"></app-sidebar>
+      <el-container id="content">
+        <app-sidebar span="250px" v-on:select="select"></app-sidebar>
         <el-container>
           <el-header>
-            <app-header></app-header>
+            <app-header v-on:change="change"></app-header>
           </el-header>
           <el-main>
             <div class="pillar"></div>
-            <app-viewer :paused="paused" :repo="repo"></app-viewer>
+            <div id="charts">
+              <div ref="chart" id="chart"></div>
+              <div ref="overview" id="overview"></div>
+            </div>
             <div class="pillar"></div>
           </el-main>
           <el-footer>
-            <app-footer v-on:paused="paused = $event"></app-footer>
+            <app-footer></app-footer>
           </el-footer>
         </el-container>
       </el-container>
@@ -23,35 +26,82 @@
 </template>
 
 <script>
-import Footer from './components/Footer'
-import Header from './components/Header'
-import Sidebar from './components/Sidebar'
-import Viewer from './components/Viewer'
+import Footer from './view/components/Footer'
+import Header from './view/components/Header'
+import Sidebar from './view/components/Sidebar'
 
-import Repository from './git/repository'
+import force from './view/charts/force'
+import overview from './view/overview'
+import { Loading } from 'element-ui'
+import Repository from './db/git/repository'
+import formatDate from './db/util/format-date'
 
 export default {
-  name: 'git-visuals',
   components: {
     'app-footer': Footer,
     'app-header': Header,
-    'app-sidebar': Sidebar,
-    'app-viewer': Viewer
+    'app-sidebar': Sidebar
   },
   data () {
     return {
-      paused: true,
+      chart: null,
       repo: null,
       repos: {}
     }
   },
+  mounted () {
+  },
   methods: {
-    onSelect (path) {
+    change (value) {
+    },
+
+    select (path) {
       let repo = this.repos[path]
       if (!repo) {
-        repo = new Repository(path)
+        repo = Repository({cwd: path})
         this.repos[path] = repo
       }
+
+      if (this.chart) this.chart.destroy()
+
+      this.chart = overview({
+        categories: repo.get('authors'),
+        height: this.$refs.overview.clientHeight,
+        id: this.$refs.overview.id,
+        margin: [20, 20, 20, 20],
+        width: this.$refs.overview.clientWidth
+      })
+
+      let loading = null
+      if (!repo.get('ready')) {
+        loading = Loading.service({
+          target: '#content',
+          text: 'Please wait while the repository loads.'
+        })
+      }
+
+      this.chart.on('selection', (data) => {
+        const dates = data.map(date => formatDate(date))
+
+        if (!this.force) {
+          this.force = force({
+            height: this.$refs.chart.clientHeight,
+            id: this.$refs.chart.id,
+            margin: [20, 20, 20, 20],
+            width: this.$refs.chart.clientWidth
+          })
+        }
+
+        this.force.update(repo.hierarchy(dates[0]))
+      })
+
+      repo.on('ready', () => {
+        if (loading) loading.close()
+        const data = repo.summaryByDate('d')
+        this.chart.update(data)
+      })
+      repo.check()
+
       this.repo = repo
     }
   }
@@ -74,6 +124,24 @@ body {
 #app {
   height: 100vh;
   width: 100vw;
+}
+
+#charts {
+  background-color: #eee;
+  border-radius: 5px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+#charts > #chart {
+  flex: 1;
+}
+
+#charts > #overview {
+  min-height: 100px;
 }
 
 .el-header {

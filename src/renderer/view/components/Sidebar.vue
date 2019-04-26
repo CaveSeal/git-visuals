@@ -7,7 +7,7 @@
     <div class="list-paths">
       <span>Projects</span>
       <div
-        v-bind:class="{active: isActive(path)}"
+        v-bind:class="{active: checkIfActive(path)}"
         v-for="path in paths"
         v-on:click="select(path)">
         {{ getName(path) }}
@@ -38,17 +38,17 @@ export default {
   },
   created () {
     ipcRenderer.on('folders', (event, path) => {
-      if (path) {
+      if (path && !this.paths.includes(path[0])) {
         this.paths.push(path[0])
       }
     })
   },
   methods: {
+    checkIfActive (path) {
+      return path === this.selected
+    },
     getName (path) {
       return basename(path)
-    },
-    isActive (path) {
-      return path === this.selected
     },
     openDialog () {
       ipcRenderer.send('openFolder', () => {

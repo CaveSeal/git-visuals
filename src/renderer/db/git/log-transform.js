@@ -3,33 +3,23 @@ import extract from '../util/extract'
 import {Transform} from 'stream'
 
 class LogTransform extends Transform {
-  constructor (opts = {}) {
-    super({...opts, objectMode: true})
+  saved = []
 
-    this.fields = opts.fields || []
-    this.modes = '(change|create|delete|rename)'
-    this.saved = []
-    this.sep = opts.sep || '@@@'
-  }
-
-  /**
-   * Release the saved commits before finishing.
-   */
-  _flush (callback) {
+  _flush (cb) {
     let data = this.parse(this.saved)
     if (data.length) {
       this.push(Buffer.from(JSON.stringify(data)))
     }
-    callback()
+    cb()
   }
 
-  _transform (chunk, _, callback) {
+  _transform (chunk, _, cb) {
     chunk = chunk.toString()
 
-    let data = chunk.split('@@@')
+    let data = chunk.split('@@@__')
     data = compact(data).map(x => x.replace(/\n\r|\r/g, '\n'))
 
-    const fresh = /^\s*@@@/.test(chunk)
+    const fresh = /^\s*@@@__/.test(chunk)
 
     if (!fresh && this.saved.length) {
       this.saved.push(this.saved.pop() + data.shift())
@@ -42,12 +32,9 @@ class LogTransform extends Transform {
       data = this.parse(data)
       this.push(Buffer.from(JSON.stringify(data)))
     }
-    callback()
+    cb()
   }
 
-  /**
-   * Parse an array of commit strings into objects.
-   */
   parse (data = []) {
     data = compact(data).filter(x => x !== '\n')
 
@@ -56,10 +43,11 @@ class LogTransform extends Transform {
         chunk = chunk.trim().split('\n')
 
         const commit = {}
-        let info = chunk.shift().split('--')
+        let info = chunk.shift().split('__')
 
         for (let i = 0; i < info.length; ++i) {
-          commit[this.fields[i]] = info[i]
+          const [key, value] = info[i].split('=')
+          commit[key] = value
         }
 
         let check = /^([0-9]|-)/
@@ -72,26 +60,33 @@ class LogTransform extends Transform {
         files = files.map((line) => {
           let [a, d, file] = line
 
-          const mode = modes.find((mode) => mode.includes(file))
-
-          let before = null
+          let was = null
           if (file.includes('=>')) {
             const match = extract(file, /{([^}]+)}/g)[0]
 
             const [left, right] = (match || file)
               .split('=>')
-              .map((side) => (match ? file.replace(/{([^}]+)}/g, side) : side))
+              .map((side) =>
+                (match ? file.replace(/{([^}]+)}/g, side) : side))
+            was = left
             file = right
-            before = left
           }
+
+          const mode = modes.find((mode) => mode.includes(file))
 
           const change = {
             a: a === '-' ? 0 : +a,
             d: d === '-' ? 0 : +d,
-            name: file,
-            was: before,
-            mode: mode ? mode.match(new RegExp(this.modes))[0] : null
+            name: file
           }
+
+          if (was) change.was = was
+
+          if (mode) {
+            change.mode = mode.match(new RegExp(/(change|create|delete|rename)/))[0]
+          }
+
+          if (a === '-') change.binary = true
 
           return change
         })
