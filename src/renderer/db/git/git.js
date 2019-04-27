@@ -1,4 +1,4 @@
-import assign from 'lodash.assign'
+import assignIn from 'lodash.assignin'
 import defaults from 'lodash.defaults'
 import {EventEmitter} from 'events'
 import flatten from '../util/flatten'
@@ -35,7 +35,7 @@ const git = function () {
     env: this.env || process.env
   }
 
-  return assign(this, {
+  return assignIn(this, {
     /**
      * Read and parse a git log.
      */

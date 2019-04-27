@@ -4,12 +4,14 @@ import {EventEmitter} from 'events'
 import * as d3 from 'd3'
 
 const chart = function () {
-  const [top, right, bottom, left] = this.margin
+  const margin = this.margin || [20, 20, 20, 20]
+  const [top, right, bottom, left] = margin
 
-  let {height, width} = this
+  let width = this.ref.clientWidth
+  let height = this.ref.clientHeight
 
   const svg = d3
-    .select(`#${this.id}`)
+    .select('#' + this.ref.id)
     .append('svg')
     .attr('width', width)
     .attr('height', height)
@@ -72,7 +74,7 @@ const chart = function () {
     },
 
     destroy () {
-      d3.select(`#${this.id}`).selectAll('*').remove()
+      d3.select('#' + this.ref.id).selectAll('*').remove()
     }
   }, EventEmitter.prototype)
 }

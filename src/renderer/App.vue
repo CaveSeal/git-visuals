@@ -65,11 +65,8 @@ export default {
       if (this.chart) this.chart.destroy()
 
       this.chart = overview({
-        categories: repo.get('authors'),
-        height: this.$refs.overview.clientHeight,
-        id: this.$refs.overview.id,
-        margin: [20, 20, 20, 20],
-        width: this.$refs.overview.clientWidth
+        ref: this.$refs.overview,
+        margin: [20, 20, 20, 20]
       })
 
       let loading = null

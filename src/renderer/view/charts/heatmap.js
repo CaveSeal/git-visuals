@@ -1,4 +1,4 @@
-import assign from 'lodash.assign'
+import assignIn from 'lodash.assignin'
 import * as d3 from 'd3'
 
 const heatmap = function () {
@@ -51,7 +51,7 @@ const heatmap = function () {
     .range(['white', '#69b3a2'])
     .domain([1, 100])
 
-  return assign(this, {
+  return assignIn(this, {
     // Update the state of the heatmap
     update: function (values) {
       svg.selectAll()

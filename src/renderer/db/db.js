@@ -74,7 +74,7 @@ const db = function () {
 
       if (found.value()) {
         found = !(fn || isFunction(fn))
-          ? found.assign(item)
+          ? found.assignIn(item)
           : found.mergeWith(item, fn)
         found.write()
       } else {

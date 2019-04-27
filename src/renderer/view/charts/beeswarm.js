@@ -1,4 +1,4 @@
-import assign from 'lodash.assign'
+import assignIn from 'lodash.assignin'
 import * as d3 from 'd3'
 
 const beeswarm = function () {
@@ -25,7 +25,7 @@ const beeswarm = function () {
       .attr('cy', d => d.y)
   }
 
-  return assign(this, {
+  return assignIn(this, {
     // Update the state of the beeswarm
     update: function (values) {
       const scale = d3.scaleLog()

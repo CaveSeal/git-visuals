@@ -1,4 +1,4 @@
-import assign from 'lodash.assign'
+import assignIn from 'lodash.assignin'
 import * as d3 from 'd3'
 
 const beeswarm = function () {
@@ -16,7 +16,7 @@ const beeswarm = function () {
 
   const color = d3.scaleOrdinal(d3.schemePastel1)
 
-  return assign(this, {
+  return assignIn(this, {
     // Update the state of the beeswarm
     update: function (values) {
       const partition = d3.partition()
