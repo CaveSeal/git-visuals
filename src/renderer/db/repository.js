@@ -1,18 +1,18 @@
 import assignIn from 'lodash.assignin'
 import {basename} from 'path'
-import database from '../db'
+import database from './db'
 import defaults from 'lodash.defaults'
+import differenceBy from 'lodash.differenceby'
 import {EventEmitter} from 'events'
 import flatten from 'lodash.flatten'
 import filter from 'lodash.filter'
 import groupBy from 'lodash.groupby'
-import groupByDate from '../util/group-by-date'
+import groupByDate from './util/group-by-date'
 import Git from './git'
 import keys from 'lodash.keys'
 import moment from 'moment'
-import range from '../util/date-range'
-// import reduce from 'lodash.reduce'
-import segments from '../util/segments'
+import range from './util/date-range'
+import segments from './util/segments'
 import sumBy from 'lodash.sumby'
 import unionBy from 'lodash.unionby'
 import uniq from 'lodash.uniq'
@@ -23,12 +23,15 @@ const repository = function () {
   const props = {
     cwd: this.cwd || process.cwd()
   }
-  const git = Git(props)
 
-  const [start, finish] = git.duration.map(date => moment(date))
+  const git = Git({
+    cwd: props.cwd
+  })
+
+  const [start, finish] = git.timespan.map(date => moment(date))
   let date = start.clone()
 
-  props.authors = git.getAuthorInfo()
+  props.authors = git.getAuthorList()
   props.endOf = start
   props.startOf = finish
 
@@ -45,7 +48,13 @@ const repository = function () {
   let [infoDate] = db.use('info').get(n => n)
   infoDate = moment(infoDate)
 
-  git.on('logData', commits => {
+  const log = git.log({
+    after: infoDate.subtract(1, 'd').format('YYYY-MM-DD')
+  })
+
+  log.on('data', commits => {
+    commits = JSON.parse(commits.toString())
+
     let items = []
 
     for (let i = 0; i < commits.length; ++i) {
@@ -61,12 +70,10 @@ const repository = function () {
   })
 
   props.ready = false
-  git.on('logDone', _ => {
+  log.on('finish', _ => {
     props.ready = true
     this.emit('ready')
   })
-
-  git.log({after: infoDate.subtract(1, 'd').format('YYYY-MM-DD')})
 
   function parse (commit) {
     let items = []
@@ -101,6 +108,7 @@ const repository = function () {
       name: name,
       createdOn: commit.date,
       parent: parent || 'root',
+      isLeaf: isFile,
       changes: [{
         author: commit.author,
         date: commit.date,
@@ -135,7 +143,8 @@ const repository = function () {
         createdOn: file.createdOn,
         deletedOn: file.deletedOn,
         name: file.name,
-        parent: file.parent
+        parent: file.parent,
+        isLeaf: file.isLeaf
       }))))
 
     return changes
@@ -151,7 +160,38 @@ const repository = function () {
     },
 
     diff: function (start, stop) {
-      // Get the difference between two dates.
+      const before = this.hierarchy(start)
+      const after = this.hierarchy(stop)
+
+      const deleted = differenceBy(before, after, 'name')
+
+      let files = after.map(file => {
+        const diff = {
+          name: file.name,
+          parent: file.parent,
+          activity: 0,
+          a: 0,
+          d: 0,
+          changed: false,
+          total: 0
+        }
+
+        const old = before.find(x => x.name === file.name)
+
+        if (old) {
+          diff.activity = file.activity - old.activity
+          diff.a = file.a - old.a
+          diff.d = file.d - old.d
+          diff.changed = moment(file.lastChanged).isAfter(old.lastChanged)
+          diff.total = file.total - old.total
+        } else {
+          diff.created = true
+        }
+        return diff
+      })
+      files = files.concat(deleted.map(file =>
+        assignIn({}, file, {deleted: true})))
+      return files
     },
 
     hierarchy: function (date) {
@@ -240,29 +280,3 @@ const repository = function () {
 }
 
 export default (target) => repository.call(target || {})
-
-// if (!moment.isMoment(date)) date = moment(date, 'YYYY-MM-DD')
-
-// const files = db.use('files').get(file => {
-//   const changes = filter(file.changes, (o) => {
-//     return date.isSameOrAfter(o.date)
-//   })
-
-//   const [a, d] = reduce(changes, (prev, curr) =>
-//     [prev[0] + curr.a, prev[1] + curr.d], [0, 0])
-
-//   file.size = a - d
-//   file.a = a
-//   file.d = d
-//   file.changes = changes
-
-//   if (changes.length) {
-//     file.author = changes[changes.length - 1].author
-//   }
-
-//   return file
-// })
-
-// return files
-//   .filter(file => !has(file, 'deletedOn') && file.size)
-//   .concat({name: 'root', parent: ''})

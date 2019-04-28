@@ -1,4 +1,5 @@
 import assignIn from 'lodash.assignin'
+import compact from 'lodash.compact'
 import defaults from 'lodash.defaults'
 import {EventEmitter} from 'events'
 import flatten from '../util/flatten'
@@ -69,19 +70,16 @@ const git = function () {
 
       stream = stream.stdout.pipe(new LogTransform())
 
-      stream.on('data', (data) =>
-        this.emit('logData', JSON.parse(data.toString())))
-
-      stream.on('finish', _ => this.emit('logDone'))
+      return stream
     },
 
-    getAuthorInfo () {
+    getAuthorList () {
       // 'shortlog' hangs on stdin
       const args = ['log', '--pretty=format:%an']
-      return uniq(this.sync(args).split('\n'))
+      return compact(uniq(this.sync(args).split('\n')))
     },
 
-    get duration () {
+    get timespan () {
       const regex = /\d{4}([.\-/ ])\d{2}\1\d{2}/
 
       let args = ['HEAD', '--pretty=format:%ai']

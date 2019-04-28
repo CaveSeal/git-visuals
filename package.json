@@ -32,6 +32,7 @@
     "lodash.assignin": "^4.2.0",
     "lodash.compact": "^3.0.1",
     "lodash.defaults": "^4.2.0",
+    "lodash.differenceby": "^4.8.0",
     "lodash.filter": "^4.6.0",
     "lodash.flatten": "^4.4.0",
     "lodash.groupby": "^4.6.0",

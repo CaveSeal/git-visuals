@@ -11,7 +11,11 @@
           <el-main>
             <div class="pillar"></div>
             <div id="charts">
-              <div ref="chart" id="chart"></div>
+              <div ref="legend" id="legend"></div>
+              <div id="compare">
+                <div ref="before" id="chart-left"></div>
+                <div ref="after" id="chart-right"></div>
+              </div>
               <div ref="overview" id="overview"></div>
             </div>
             <div class="pillar"></div>
@@ -30,10 +34,11 @@ import Footer from './view/components/Footer'
 import Header from './view/components/Header'
 import Sidebar from './view/components/Sidebar'
 
-import force from './view/charts/force'
-import overview from './view/overview'
+import Force from './view/charts/force'
+import Legend from './view/legend'
+import Overview from './view/overview'
 import { Loading } from 'element-ui'
-import Repository from './db/git/repository'
+import Repository from './db/repository'
 import formatDate from './db/util/format-date'
 
 export default {
@@ -49,8 +54,6 @@ export default {
       repos: {}
     }
   },
-  mounted () {
-  },
   methods: {
     change (value) {
     },
@@ -62,11 +65,16 @@ export default {
         this.repos[path] = repo
       }
 
-      if (this.chart) this.chart.destroy()
+      if (this.overview) this.overview.destroy()
 
-      this.chart = overview({
+      this.overview = Overview({
         ref: this.$refs.overview,
         margin: [20, 20, 20, 20]
+      })
+
+      this.legend = Legend({
+        ref: this.$refs.legend,
+        values: repo.get('authors')
       })
 
       let loading = null
@@ -77,25 +85,39 @@ export default {
         })
       }
 
-      this.chart.on('selection', (data) => {
+      // Clean up force graphs.
+      if (this.after) this.after.destroy()
+      this.after = null
+
+      if (this.before) this.before.destroy()
+      this.before = null
+
+      // Update force graphs on selection change.
+      this.overview.on('selection', (data) => {
         const dates = data.map(date => formatDate(date))
 
-        if (!this.force) {
-          this.force = force({
-            height: this.$refs.chart.clientHeight,
-            id: this.$refs.chart.id,
-            margin: [20, 20, 20, 20],
-            width: this.$refs.chart.clientWidth
+        if (!this.before) {
+          this.before = Force({
+            legend: this.legend,
+            ref: this.$refs.before
           })
         }
+        this.before.update(repo.hierarchy(dates[0]))
 
-        this.force.update(repo.hierarchy(dates[0]))
+        if (!this.after) {
+          this.after = Force({
+            legend: this.legend,
+            ref: this.$refs.after
+          })
+        }
+        this.after.update(repo.hierarchy(dates[1]))
       })
 
       repo.on('ready', () => {
         if (loading) loading.close()
+
         const data = repo.summaryByDate('d')
-        this.chart.update(data)
+        this.overview.update(data)
       })
       repo.check()
 
@@ -133,12 +155,35 @@ body {
   position: relative;
 }
 
-#charts > #chart {
+#charts > #compare {
+  display: flex;
   flex: 1;
+  flex-direction: row;
 }
 
 #charts > #overview {
   min-height: 100px;
+}
+
+#charts > #legend {
+  height: 200px;
+  left: 2%;
+  width: 100px;
+  position: absolute;
+  overflow: auto;
+  top: 2%;
+}
+
+#chart-left,
+#chart-right {
+  border-bottom: 1px solid #ccc;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+#chart-left {
+  border-right: 1px solid #ccc;
 }
 
 .el-header {

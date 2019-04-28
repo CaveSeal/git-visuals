@@ -3,16 +3,18 @@ import * as d3 from 'd3'
 import {EventEmitter} from 'events'
 
 function force () {
-  const [top, right, bottom, left] = this.margin
+  const margin = this.margin || [20, 20, 20, 20]
+  const [top, right, bottom, left] = margin
 
-  let {height, width} = this
+  let height = this.ref.clientHeight
+  let width = this.ref.clientWidth
 
   const zoom = d3.zoom()
-    .scaleExtent([1, 10])
+    .scaleExtent([-2, 2])
     .on('zoom', () => g.attr('transform', d3.event.transform))
 
   const svg = d3
-    .select(`#${this.id}`)
+    .select('#' + this.ref.id)
     .append('svg')
     .attr('height', height)
     .attr('width', width)
@@ -27,15 +29,19 @@ function force () {
   let link = g.append('g').selectAll('.link')
   let node = g.append('g').selectAll('.node')
 
-  let nodes = []
-  let links = []
+  let color = null
+  if (this.legend) {
+    color = this.legend.get('color')
+  } else {
+    color = d3.scaleOrdinal().range(d3.schemePastel1)
+  }
 
   const linkForce = d3.forceLink()
     .id((d) => d.data.id)
-    .strength((d) => d.target.children && d.target.children.length ? 0.2 : 0.5)
+    .strength((d) => d.target.children && d.target.children.length ? 0.3 : 0.7)
 
   const tooltip = d3
-    .select(`#${this.id}`)
+    .select('#' + this.ref.id)
     .append('div')
     .style('opacity', 0)
     .attr('class', 'tooltip')
@@ -67,13 +73,13 @@ function force () {
     .alphaTarget(1)
     .on('tick', ticked)
 
-  const color = d3.scaleOrdinal(d3.schemePastel1)
-
   const mousemove = function (d) {
     tooltip
       .html(`
         <span>
-          Hello!
+          ${d.data.name}</br>
+          Created by ${d.data.author}</br>
+          ${d.data.total} Lines
         </span>
       `)
       .style('opacity', 1)
@@ -92,12 +98,12 @@ function force () {
         .id(d => d.name)
         .parentId(d => d.parent)(values)
 
-      links = root.links()
-      nodes = root.descendants()
+      let links = root.links()
+      let nodes = root.descendants()
 
       const scale = d3.scaleLinear()
         .domain(d3.extent(nodes, d => d.data.a - d.data.d))
-        .range([3, 8])
+        .range([2, 8])
 
       link = link
         .data(links, d => d.source.data.id + '-' + d.target.data.id)
@@ -130,7 +136,7 @@ function force () {
     },
 
     destroy () {
-      d3.select(`#${this.id}`).selectAll('*').remove()
+      d3.select('#' + this.ref.id).selectAll('*').remove()
     }
   }, EventEmitter.prototype)
 }
