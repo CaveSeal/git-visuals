@@ -13,8 +13,12 @@
             <div id="charts">
               <div ref="legend" id="legend"></div>
               <div id="compare">
-                <div ref="before" id="chart-left"></div>
-                <div ref="after" id="chart-right"></div>
+                <div ref="before" id="chart-left">
+                  <span class="date">{{ start }}</span>
+                </div>
+                <div ref="after" id="chart-right">
+                  <span class="date">{{ stop }}</span>
+                </div>
               </div>
               <div ref="overview" id="overview"></div>
             </div>
@@ -51,7 +55,9 @@ export default {
     return {
       chart: null,
       repo: null,
-      repos: {}
+      repos: {},
+      start: '',
+      stop: ''
     }
   },
   methods: {
@@ -102,6 +108,7 @@ export default {
             ref: this.$refs.before
           })
         }
+        this.start = dates[0]
         this.before.update(repo.hierarchy(dates[0]))
 
         if (!this.after) {
@@ -110,6 +117,7 @@ export default {
             ref: this.$refs.after
           })
         }
+        this.stop = dates[1]
         this.after.update(repo.hierarchy(dates[1]))
       })
 
@@ -170,8 +178,13 @@ body {
   left: 2%;
   width: 100px;
   position: absolute;
-  overflow: auto;
+  overflow-y: scroll;
   top: 2%;
+  z-index: 1;
+}
+
+#legend::-webkit-scrollbar {
+  width: 0 !important
 }
 
 #chart-left,
@@ -180,10 +193,21 @@ body {
   flex: 1;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 #chart-left {
   border-right: 1px solid #ccc;
+}
+
+.date {
+  bottom: 1%;
+  left: 0;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100px;
+  position: absolute;
+  right: 0;
 }
 
 .el-header {
@@ -194,12 +218,6 @@ body {
 .el-main,
 .el-footer {
   padding: 0;
-}
-
-.date-picker {
-  align-items: center;
-  display: flex;
-  height: 100%;
 }
 
 .el-main {
@@ -215,16 +233,6 @@ body {
 
 .el-container {
   height: 100%
-}
-
-.el-progress-bar__outer{
-  background: #ddd;
-  border-radius: 5px 5px 0px 0px;
-}
-
-.el-progress-bar__inner {
-  background-color: #4ecca3;
-  border-radius: 0px;
 }
 
 .window-frame {

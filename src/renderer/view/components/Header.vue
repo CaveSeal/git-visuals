@@ -41,4 +41,8 @@ export default {
   padding-right: 20px;
   width: 100%;
 }
+
+.el-select {
+  display: none;
+}
 </style>
