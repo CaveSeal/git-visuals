@@ -79,7 +79,9 @@ function force () {
         <span>
           ${d.data.name}</br>
           Changed by ${d.data.author}</br>
-          ${d.data.total} Lines
+          ${d.data.total} Lines</br>
+          ${d.data.a} Additions</br>
+          ${d.data.d} Deletions
         </span>
       `)
       .style('opacity', 1)
@@ -103,7 +105,7 @@ function force () {
 
       const scale = d3.scaleLinear()
         .domain(d3.extent(nodes, d => d.data.a - d.data.d))
-        .range([2, 8])
+        .range([2, 10])
 
       link = link
         .data(links, d => d.source.data.id + '-' + d.target.data.id)
