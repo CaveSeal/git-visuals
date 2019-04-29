@@ -1,8 +1,6 @@
 import assignIn from 'lodash.assignin'
 import {basename} from 'path'
 import database from './db'
-import defaults from 'lodash.defaults'
-import differenceBy from 'lodash.differenceby'
 import {EventEmitter} from 'events'
 import flatten from 'lodash.flatten'
 import filter from 'lodash.filter'
@@ -17,7 +15,6 @@ import sumBy from 'lodash.sumby'
 import unionBy from 'lodash.unionby'
 import uniq from 'lodash.uniq'
 import values from 'lodash.values'
-import zipObject from 'lodash.zipobject'
 
 const repository = function () {
   const props = {
@@ -159,41 +156,6 @@ const repository = function () {
       return props[key]
     },
 
-    diff: function (start, stop) {
-      const before = this.hierarchy(start)
-      const after = this.hierarchy(stop)
-
-      const deleted = differenceBy(before, after, 'name')
-
-      let files = after.map(file => {
-        const diff = {
-          name: file.name,
-          parent: file.parent,
-          activity: 0,
-          a: 0,
-          d: 0,
-          changed: false,
-          total: 0
-        }
-
-        const old = before.find(x => x.name === file.name)
-
-        if (old) {
-          diff.activity = file.activity - old.activity
-          diff.a = file.a - old.a
-          diff.d = file.d - old.d
-          diff.changed = moment(file.lastChanged).isAfter(old.lastChanged)
-          diff.total = file.total - old.total
-        } else {
-          diff.created = true
-        }
-        return diff
-      })
-      files = files.concat(deleted.map(file =>
-        assignIn({}, file, {deleted: true})))
-      return files
-    },
-
     hierarchy: function (date) {
       date = moment(date, 'YYYY-MM-DD')
 
@@ -228,7 +190,7 @@ const repository = function () {
       return files
     },
 
-    summaryByDate: function (unit) {
+    summary: function (unit) {
       unit = moment.normalizeUnits(unit)
 
       const files = filter(getFiles(), file => file.isLeaf)
@@ -251,31 +213,6 @@ const repository = function () {
         group.total += a + d
       })
       return groups
-    },
-
-    summary: function (opts = {}) {
-      opts = defaults(opts, {})
-
-      const files = getFiles()
-
-      const dates = groupByDate(flatten(files))
-      const count = props.authors.length
-
-      const groups = keys(dates)
-        .map(i => {
-          const zip = zipObject(
-            ['date', 'total', ...props.authors],
-            [i, 0, ...new Array(count).fill(0)])
-
-          const authors = groupBy(dates[i], 'author')
-          keys(authors).forEach(j => {
-            const sum = sumBy(authors[j], 'a')
-            zip[j] = sum
-            zip['total'] += sum
-          })
-          return zip
-        })
-      return groups.sort((a, b) => moment(a.date) - moment(b.date))
     }
   }, EventEmitter.prototype)
 }

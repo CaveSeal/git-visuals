@@ -126,7 +126,7 @@ export default {
       repo.on('ready', () => {
         if (loading) loading.close()
 
-        const data = repo.summaryByDate('d')
+        const data = repo.summary('d')
         this.overview.update(data)
       })
       repo.check()
