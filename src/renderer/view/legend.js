@@ -45,6 +45,10 @@ const legend = function () {
     // Define any methods.
     get: function (key) {
       return props[key]
+    },
+
+    destroy: function () {
+      d3.select('#' + this.ref.id).selectAll('*').remove()
     }
   })
 }

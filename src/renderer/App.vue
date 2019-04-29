@@ -78,6 +78,8 @@ export default {
         margin: [20, 20, 20, 20]
       })
 
+      if (this.legend) this.legend.destroy()
+
       this.legend = Legend({
         ref: this.$refs.legend,
         values: repo.get('authors')
