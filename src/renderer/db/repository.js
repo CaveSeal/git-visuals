@@ -231,7 +231,8 @@ const repository = function () {
     summaryByDate: function (unit) {
       unit = moment.normalizeUnits(unit)
 
-      const dates = groupByDate(flatten(getFiles()))
+      const files = filter(getFiles(), file => file.isLeaf)
+      const dates = groupByDate(flatten(files))
 
       const groups = range(start, finish, unit, 'YYYY-MM-DD')
         .map(date => ({date: date, a: 0, d: 0, total: 0}))

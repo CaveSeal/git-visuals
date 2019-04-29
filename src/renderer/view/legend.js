@@ -19,7 +19,7 @@ const legend = function () {
         .attr('y', (_, i) => 10 + i * 10)
         .style('fill', d => props.color(d))
         .text(d => d)
-        .style('font-size', '0.5rem')
+        .style('font-size', '0.6rem')
         .attr('text-anchor', 'left')
         .style('alignment-baseline', 'middle'),
       update => update

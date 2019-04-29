@@ -78,7 +78,7 @@ function force () {
       .html(`
         <span>
           ${d.data.name}</br>
-          Created by ${d.data.author}</br>
+          Changed by ${d.data.author}</br>
           ${d.data.total} Lines
         </span>
       `)
