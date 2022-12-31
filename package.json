@@ -28,7 +28,7 @@
     "axios": "^0.18.0",
     "d3": "^5.9.2",
     "element-ui": "^2.7.2",
-    "flat": "^4.1.0",
+    "flat": "^5.0.1",
     "lodash.assignin": "^4.2.0",
     "lodash.compact": "^3.0.1",
     "lodash.defaults": "^4.2.0",
